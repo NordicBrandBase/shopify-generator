@@ -1959,7 +1959,6 @@ async function generate() {
     r1[C['Variant Requires Shipping']] = 'true';
     r1[C['Variant Taxable']] = 'true';
     r1[C['Variant Barcode']] = gtin ? String(gtin) : null;
-    r1[C['Image Position']] = '1';
     r1[C['Gift Card']] = 'false';
     r1[C['SEO Title']] = seoData.seoTitle || null;
     r1[C['SEO Description']] = seoData.metaDesc || null;
@@ -2012,7 +2011,40 @@ async function generate() {
     r3[C['Variant Barcode']] = gtin ? String(gtin) : null;
     r3[C['Variant Weight Unit']] = 'g';
 
+    // --- Shopify images ---
+    const images = findShopifyImages(handle);
+    const img1 = images[0] || null;
+    const img2 = images[1] || null;
+    const img3 = images[2] || null;
+
+    // Row 1: image-1 + variant image
+    r1[C['Image Src']] = img1;
+    r1[C['Image Position']] = img1 ? '1' : null;
+    r1[C['Variant Image']] = img1;
+
+    // Row 2 (10-pack variant): variant image = img1
+    r2[C['Variant Image']] = img1;
+
+    // Row 3 (40-pack variant): variant image = img1
+    r3[C['Variant Image']] = img1;
+
     outputRows.push(r1, r2, r3);
+
+    // Extra image rows (only Handle + Image Src + Image Position)
+    if (img2) {
+      const imgRow2 = emptyRow();
+      imgRow2[C['Handle']] = handle;
+      imgRow2[C['Image Src']] = img2;
+      imgRow2[C['Image Position']] = '2';
+      outputRows.push(imgRow2);
+    }
+    if (img3) {
+      const imgRow3 = emptyRow();
+      imgRow3[C['Handle']] = handle;
+      imgRow3[C['Image Src']] = img3;
+      imgRow3[C['Image Position']] = '3';
+      outputRows.push(imgRow3);
+    }
 
     // Build SnusCorp rows
     try {
@@ -2024,7 +2056,32 @@ async function generate() {
         gtin, format, mgG, mgPouch, pouches, pouchW, manufacturer, strength, taste
       };
       const [cr1, cr2, cr3] = buildCorpRows(corpParams);
+
+      // Add images to SnusCorp rows
+      const CC = {};
+      SNUSCORP_HEADERS.forEach((h, i) => { CC[h] = i; });
+      cr1[CC['Image Src']] = img1;
+      cr1[CC['Image Position']] = img1 ? '1' : null;
+      cr1[CC['Variant Image']] = img1;
+      cr2[CC['Variant Image']] = img1;
+      cr3[CC['Variant Image']] = img1;
       corpRows.push(cr1, cr2, cr3);
+
+      // Extra image rows for SnusCorp
+      if (img2) {
+        const cImgRow2 = new Array(SNUSCORP_HEADERS.length).fill(null);
+        cImgRow2[CC['Handle']] = handle;
+        cImgRow2[CC['Image Src']] = img2;
+        cImgRow2[CC['Image Position']] = '2';
+        corpRows.push(cImgRow2);
+      }
+      if (img3) {
+        const cImgRow3 = new Array(SNUSCORP_HEADERS.length).fill(null);
+        cImgRow3[CC['Handle']] = handle;
+        cImgRow3[CC['Image Src']] = img3;
+        cImgRow3[CC['Image Position']] = '3';
+        corpRows.push(cImgRow3);
+      }
     } catch(e) {
       addLog('warn', 'CORP', `${name}: SnusCorp-række fejlede — ${e.message}`);
     }
@@ -2787,21 +2844,37 @@ async function shopifyFetchImages() {
   document.getElementById('shopify-fetch-btn').disabled = false;
 }
 
-function findShopifyImage(productTitle, sku) {
-  if (!state.shopifyImageMap) return null;
-  const titleSlug = (productTitle || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
-  const skuSlug = (sku || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
-
-  for (const [filename, url] of Object.entries(state.shopifyImageMap)) {
-    if (titleSlug && filename.includes(titleSlug)) return url;
-    if (skuSlug && filename.includes(skuSlug)) return url;
+function findShopifyImages(handle) {
+  // Returns array of up to 3 image URLs for a given handle
+  // Looks for handle-1.png, handle-2.png, handle-3.png etc.
+  if (!state.shopifyImageMap) return [];
+  const images = [];
+  for (let i = 1; i <= 3; i++) {
+    // Try various extensions
+    const extensions = ['png', 'jpg', 'jpeg', 'webp'];
+    let found = null;
+    for (const ext of extensions) {
+      const key = `${handle}-${i}.${ext}`;
+      if (state.shopifyImageMap[key]) {
+        found = state.shopifyImageMap[key];
+        break;
+      }
+    }
+    if (found) images.push(found);
+    else if (i === 1) break; // No image 1 = no images at all
+    else break; // Stop at first missing
   }
-  return null;
+  return images;
 }
 
 // Init on load
 shopifyInit();
 
+// Init MSAL only if not in Shopify OAuth flow
+const _sp = new URLSearchParams(window.location.search);
+if (!(_sp.get('code') && _sp.get('shop'))) {
+  odInit();
+}
 </script>
 </body>
 </html>
