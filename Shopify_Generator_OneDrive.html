@@ -1,0 +1,2655 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnusCrew · Shopify Generator</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #f0f4f8;
+    --surface: #ffffff;
+    --surface2: #e6edf5;
+    --border: #c2d0e0;
+    --accent: #1b3b6a;
+    --accent2: #ff5300;
+    --accent-light: #6fa8d0;
+    --green: #0ea672;
+    --text: #1b3b6a;
+    --muted: #6b8aaa;
+    --success: #eafaf3;
+    --success-border: #86efcc;
+    --error: #fff4f0;
+    --error-border: #ffb89a;
+    --warn: #fffbea;
+    --warn-border: #fcd34d;
+    --bg-input: #f5f8fc;
+    --shadow: 0 2px 16px rgba(27,59,106,0.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  select {
+    color: #1b3b6a !important;
+    background-color: var(--bg-input, #f5f8fc) !important;
+  }
+  select option {
+    color: #1b3b6a;
+    background-color: #ffffff;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 56px;
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .logo-mark {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #1b3b6a, #6fa8d0);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: #ffffff;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 32px;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Steps */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    border-radius: 16px;
+    padding: 24px 28px;
+    transition: border-color 0.2s;
+  }
+
+  .step.active {
+    border-color: var(--accent);
+  }
+
+  .step.done {
+    border-color: var(--success-border);
+    background: var(--success);
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .step.active .step-num {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .step.done .step-num {
+    background: var(--green);
+    border-color: var(--green);
+    color: #0a0a0f;
+  }
+
+  .step-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.2px;
+  }
+
+  .step-tag {
+    margin-left: auto;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    letter-spacing: 0.5px;
+  }
+
+  .step.active .step-tag {
+    background: rgba(124,106,255,0.15);
+    color: var(--accent);
+    border-color: rgba(124,106,255,0.3);
+  }
+
+  /* Upload zones */
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone:hover {
+    border-color: var(--accent);
+    background: rgba(124,106,255,0.04);
+  }
+
+  .upload-zone.has-file {
+    border-color: var(--success-border);
+    background: rgba(77,255,180,0.04);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .upload-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .upload-zone.has-file .upload-icon {
+    background: rgba(77,255,180,0.15);
+    border-color: var(--success-border);
+  }
+
+  .upload-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .upload-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .upload-hint {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .upload-filename {
+    font-size: 11px;
+    color: var(--green);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .upload-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(77,255,180,0.1);
+    color: var(--green);
+    border: 1px solid rgba(77,255,180,0.2);
+    white-space: nowrap;
+  }
+
+  .upload-optional {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  /* Brand filter */
+  .brand-section {
+    margin-top: 16px;
+  }
+
+  .field-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .brand-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 2px;
+  }
+
+  .brand-grid::-webkit-scrollbar { width: 4px; }
+  .brand-grid::-webkit-scrollbar-track { background: transparent; }
+  .brand-grid::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
+
+  .brand-chip {
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .brand-chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .brand-chip.selected {
+    background: rgba(27,59,106,0.08);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .brand-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .btn-ghost {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Generate button */
+  .generate-btn {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 18px 36px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #1b3b6a, #6fa8d0);
+    border: none;
+    color: white;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 24px;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .generate-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .generate-btn:hover::after { opacity: 1; }
+  .generate-btn:active { transform: scale(0.99); }
+  .generate-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Progress */
+  .progress-bar {
+    height: 2px;
+    background: var(--surface2);
+    border-radius: 1px;
+    margin-top: 16px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #1b3b6a, #6fa8d0);
+    border-radius: 1px;
+    transition: width 0.3s;
+    width: 0%;
+  }
+
+  /* Log */
+  .log-container {
+    margin-top: 24px;
+    display: none;
+  }
+
+  .log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .log-title {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .log-count {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .log-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    max-height: 280px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.7;
+  }
+
+  .log-box::-webkit-scrollbar { width: 4px; }
+  .log-box::-webkit-scrollbar-track { background: transparent; }
+  .log-box::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
+
+  .log-line { display: flex; gap: 10px; padding: 2px 0; }
+  .log-line.info .log-tag { color: var(--accent); }
+  .log-line.ok .log-tag { color: #0ea672; font-weight:600; }
+  .log-line.warn .log-tag { color: var(--accent2); font-weight:600; }
+  .log-line.error .log-tag { color: var(--accent2); }
+  .log-tag { min-width: 50px; font-weight: 500; }
+  .log-msg { color: var(--muted); }
+  .log-line.ok .log-msg { color: var(--text); }
+
+  /* Output */
+  .output-section {
+    margin-top: 24px;
+    display: none;
+  }
+
+  .output-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .output-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color 0.2s;
+  }
+
+  .output-card:hover { border-color: var(--accent); }
+
+  .output-card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .output-card-meta {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .output-stat {
+    font-size: 28px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    color: var(--accent);
+  }
+
+  .download-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    background: rgba(124,106,255,0.12);
+    border: 1px solid rgba(124,106,255,0.3);
+    color: var(--accent);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    display: block;
+    width: 100%;
+  }
+
+  .download-btn:hover {
+    background: rgba(124,106,255,0.2);
+    border-color: var(--accent);
+  }
+
+  .download-btn.log-dl {
+    background: rgba(255,106,124,0.08);
+    border-color: rgba(255,106,124,0.25);
+    color: var(--accent2);
+  }
+
+  .download-btn.log-dl:hover {
+    background: rgba(255,106,124,0.15);
+    border-color: var(--accent2);
+  }
+
+  /* Stats */
+  .stats-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .stat-pill {
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .stat-pill.green { border-color: var(--success-border); color: var(--green); }
+  .stat-pill.red { border-color: var(--error-border); color: var(--accent2); }
+  .stat-pill.red { border-color: var(--error-border); color: var(--accent2); }
+
+  /* Separator */
+  .sep {
+    height: 1px;
+    background: var(--surface2);
+    margin: 4px 0;
+  }
+
+  /* OneDrive panel */
+  .onedrive-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 16px;
+  }
+  .onedrive-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 0;
+  }
+  .od-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #0364b8, #1bc0f0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .od-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    flex: 1;
+  }
+  .od-subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .od-badge {
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .od-badge.connected {
+    background: rgba(14,166,114,0.1);
+    border-color: var(--success-border);
+    color: var(--green);
+  }
+  .od-badge.error {
+    background: var(--error);
+    border-color: var(--error-border);
+    color: var(--accent2);
+  }
+  .od-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .od-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .od-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .od-btn.primary {
+    background: linear-gradient(135deg, #0364b8, #1bc0f0);
+    border-color: transparent;
+    color: white;
+  }
+  .od-btn.primary:hover {
+    opacity: 0.9;
+    color: white;
+  }
+  .od-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .od-file-status {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .od-file-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 7px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+  .od-file-icon { font-size: 14px; }
+  .od-file-name { flex: 1; color: var(--muted); }
+  .od-file-name.loaded { color: var(--green); font-weight: 500; }
+  .od-file-tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .od-file-tag.ok {
+    background: rgba(14,166,114,0.1);
+    border-color: var(--success-border);
+    color: var(--green);
+  }
+  .od-file-tag.loading {
+    background: rgba(27,59,106,0.08);
+    border-color: rgba(27,59,106,0.2);
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo-mark">SC</div>
+    <div>
+      <h1>Shopify <span>Generator</span></h1>
+      <div class="subtitle">Nordic BrandBase · Import Tool</div>
+    </div>
+  </header>
+
+  <!-- OneDrive Panel -->
+  <div class="onedrive-panel" id="od-panel">
+    <div class="onedrive-header">
+      <div class="od-logo">☁️</div>
+      <div>
+        <div class="od-title">Hent fra SharePoint</div>
+        <div class="od-subtitle">Nordic BrandBase · sites/Digital</div>
+      </div>
+      <div class="od-badge" id="od-badge">IKKE LOGGET IND</div>
+    </div>
+    <div class="od-actions">
+      <button class="od-btn primary" id="od-login-btn" onclick="odLogin()">🔑 Log ind med Microsoft</button>
+      <button class="od-btn" id="od-fetch-btn" onclick="odFetchAll()" disabled>⬇ Hent alle filer</button>
+      <button class="od-btn" id="od-logout-btn" onclick="odLogout()" style="display:none; margin-left:auto;">Log ud</button>
+    </div>
+    <div class="od-file-status" id="od-file-status" style="display:none;">
+      <div class="od-file-row">
+        <span class="od-file-icon">📋</span>
+        <span class="od-file-name" id="od-meta-name">Metadata-ark</span>
+        <span class="od-file-tag" id="od-meta-tag">AFVENTER</span>
+      </div>
+      <div class="od-file-row">
+        <span class="od-file-icon">💰</span>
+        <span class="od-file-name" id="od-price-name">Prisark</span>
+        <span class="od-file-tag" id="od-price-tag">AFVENTER</span>
+      </div>
+      <div class="od-file-row">
+        <span class="od-file-icon">📝</span>
+        <span class="od-file-name" id="od-text-name">Tekstfil</span>
+        <span class="od-file-tag" id="od-text-tag">AFVENTER</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- Step 1: Files -->
+    <div class="step active" id="step1">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div class="step-title">Upload filer</div>
+        <div class="step-tag">PÅKRÆVET</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+
+        <div class="upload-zone" id="zone-meta">
+          <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFile(event,'meta')">
+          <div class="upload-icon">📋</div>
+          <div class="upload-info">
+            <div class="upload-label">Metadata-ark</div>
+            <div class="upload-hint">SKU, GTIN, ingredienser, styrke, format mm.</div>
+            <div class="upload-filename" id="meta-name">Ingen fil valgt</div>
+          </div>
+          <div class="upload-optional" id="meta-badge">XLSX / CSV</div>
+        </div>
+
+        <div class="upload-zone" id="zone-price">
+          <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFile(event,'price')">
+          <div class="upload-icon">💰</div>
+          <div class="upload-info">
+            <div class="upload-label">Prisark</div>
+            <div class="upload-hint">Brand, pack size og salgspris</div>
+            <div class="upload-filename" id="price-name">Ingen fil valgt</div>
+          </div>
+          <div class="upload-optional" id="price-badge">XLSX / CSV</div>
+        </div>
+        <div id="price-sheet-selector" style="display:none; align-items:center; gap:8px; margin-top:8px; padding:6px 12px; background:var(--surface2); border-radius:8px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">Vælg ark:</span>
+          <select id="price-sheet-select" onchange="selectPriceSheet(this.value)"
+            style="background:var(--bg-input,#f8faff); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:4px 10px; font-size:13px; cursor:pointer; max-width:300px; flex:1;">
+          </select>
+        </div>
+
+        <div class="upload-zone" id="zone-text">
+          <input type="file" accept=".txt,.docx,.xlsx,.xls" onchange="handleFile(event,'text')">
+          <div class="upload-icon">📝</div>
+          <div class="upload-info">
+            <div class="upload-label">Tekstfil <span style="color:var(--muted)">(valgfri)</span></div>
+            <div class="upload-hint">SEO Title og Meta Description pr. produkt</div>
+            <div class="upload-filename" id="text-name">Ingen fil valgt — SEO felter efterlades tomme</div>
+          </div>
+          <div class="upload-optional" id="text-badge">TXT / DOCX / XLSX</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Step 2: Brand + SKU filter -->
+    <div class="step" id="step2">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">Vælg brand og produkter</div>
+        <div class="step-tag">FILTER</div>
+      </div>
+      <div class="brand-section">
+        <div class="field-label">Vælg brand</div>
+        <select id="brand-dropdown" onchange="selectBrand(this.value)"
+          style="width:100%; background:var(--bg-input,#f8faff); color:#fff; border:1px solid #444;
+                 border-radius:8px; padding:10px 14px; font-size:14px; cursor:pointer; margin-bottom:16px;">
+          <option value="">-- Vælg brand --</option>
+        </select>
+        <div id="sku-section" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div class="field-label" style="margin:0">Vælg produkter</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-ghost" onclick="selectAllSkus()">Vælg alle</button>
+              <button class="btn-ghost" onclick="clearSkus()">Fravælg alle</button>
+            </div>
+          </div>
+          <div id="sku-grid" style="display:flex; flex-direction:column; gap:6px; max-height:320px; overflow-y:auto;"></div>
+        </div>
+        <div id="brand-placeholder" style="color:var(--muted);font-size:12px;">
+          Upload metadata-ark for at se brands...
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Generate -->
+    <div class="step" id="step3">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div class="step-title">Generér Shopify-import</div>
+        <div class="step-tag">OUTPUT</div>
+      </div>
+
+      <button class="generate-btn" onclick="generate()" id="gen-btn" disabled>
+        ⚡ Generér Shopify-importfil
+      </button>
+
+      <div class="progress-bar" id="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- Output -->
+  <div class="output-section" id="output-section">
+    <div class="output-cards">
+      <div class="output-card">
+        <div class="output-card-title">Shopify Import</div>
+        <div class="output-stat" id="stat-rows">0</div>
+        <div class="output-card-meta" id="stat-detail">produkter · 0 rækker</div>
+        <div class="stats-row" id="stats-pills"></div>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+          <div style="display:flex; align-items:center; gap:16px;">
+            <span style="font-size:13px; font-weight:600; width:70px;">SnusCrew</span>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+              <input type="radio" name="fmt-crew" value="xlsx" onchange="state.fmtCrew='xlsx'" style="accent-color:#7c6ef5;"> XLSX
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+              <input type="radio" name="fmt-crew" value="csv" onchange="state.fmtCrew='csv'" style="accent-color:#7c6ef5;"> CSV (semikolon)
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+              <input type="radio" name="fmt-crew" value="both" checked onchange="state.fmtCrew='both'" style="accent-color:#7c6ef5;"> Begge
+            </label>
+          </div>
+          <div style="display:flex; align-items:center; gap:16px;">
+            <span style="font-size:13px; font-weight:600; width:70px;">SnusCorp</span>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+              <input type="radio" name="fmt-corp" value="xlsx" onchange="state.fmtCorp='xlsx'" style="accent-color:#7c6ef5;"> XLSX
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+              <input type="radio" name="fmt-corp" value="csv" onchange="state.fmtCorp='csv'" style="accent-color:#7c6ef5;"> CSV (semikolon)
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+              <input type="radio" name="fmt-corp" value="both" checked onchange="state.fmtCorp='both'" style="accent-color:#7c6ef5;"> Begge
+            </label>
+          </div>
+        </div>
+        <button class="download-btn" onclick="downloadAll();">⬇ Download</button>
+      </div>
+      <div class="output-card" style="display:flex; flex-direction:column;">
+        <div class="output-card-title">Opsummering</div>
+        <div id="summary-log" style="flex:1; overflow-y:auto; max-height:220px; font-size:12px; line-height:1.7; color:var(--text);">
+          <div style="color:var(--muted); font-style:italic;">Kør generering for at se opsummering...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  metaData: null,
+  priceWB: null,
+  metaHeaders: null,
+  priceData: null,
+  textContent: null,
+  textData: null,
+  textDataCorp: null,
+  outputWBCorp: null,
+  fmtCrew: 'both',
+  fmtCorp: 'both',
+  brands: [],
+  selectedBrands: new Set(),
+  selectedSkus: new Set(),
+  brandProducts: [],
+  outputWB: null,
+  logLines: [],
+  stats: { ok: 0, warn: 0, error: 0, skipped: 0 }
+};
+
+// ============================================================
+// FILE HANDLING
+// ============================================================
+async function handleFile(event, type) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (type === 'text') {
+    await handleTextFile(file);
+    return;
+  }
+
+  const data = await file.arrayBuffer();
+  const wb = XLSX.read(data, { type: 'array', cellFormula: false, cellNF: false, raw: false });
+  const sheetName = (type === 'meta')
+    ? (wb.SheetNames.find(n => n.toLowerCase() === 'metadata') || wb.SheetNames[0])
+    : wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+  if (type === 'meta') {
+    state.metaHeaders = rows[0];
+    state.metaData = rows.slice(1).filter(r => r.some(v => v !== null));
+    document.getElementById('meta-name').textContent = file.name + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
+    document.getElementById('zone-meta').classList.add('has-file');
+    document.getElementById('meta-badge').className = 'upload-badge';
+    document.getElementById('meta-badge').textContent = '✓ INDLÆST';
+    addLog('ok', 'META', `${file.name} — ${state.metaData.length} produkter fundet`);
+    buildBrandList();
+  }
+
+  if (type === 'price') {
+    // Debug: log first 10 rows of price data
+    console.log('Price file rows 0-10:', rows.slice(0, 10));
+    console.log('Price file row 4 types:', rows[4] ? rows[4].slice(0,6).map(v => `${v}(${typeof v})`) : 'empty');
+    state.priceWB = wb;
+    state.priceData = rows;
+    document.getElementById('price-name').textContent = file.name;
+
+    // Populate and show sheet selector
+    const sel = document.getElementById('price-sheet-select');
+    sel.innerHTML = wb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+    sel.value = wb.SheetNames[0];
+    document.getElementById('price-sheet-selector').style.display = 'flex';
+
+    document.getElementById('zone-price').classList.add('has-file');
+    document.getElementById('price-badge').className = 'upload-badge';
+    document.getElementById('price-badge').textContent = '✓ INDLÆST';
+    addLog('ok', 'PRIS', `${file.name} indlæst`);
+    buildBrandList();
+  }
+
+  checkReady();
+}
+
+async function handleTextFile(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: 'array' });
+
+    function parseTextSheet(ws) {
+      if (!ws) return {};
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      const map = {};
+      for (const row of rows.slice(1)) {
+        const brand = row[0];
+        const produkt = row[1];
+        if (!produkt) continue;
+        const entry = {
+          seoHeadline: row[2] ? String(row[2]).trim().replace(/ -- /g, ' - ') : null,
+          seoTitle:    row[3] ? String(row[3]).trim().replace(/ -- /g, ' - ') : null,
+          metaDesc:    row[4] ? String(row[4]).trim() : null,
+          shortDesc:   row[5] ? String(row[5]).trim() : null,
+          longDesc:    row[6] ? String(row[6]).trim() : null
+        };
+        // Store with brand+produkt key for precise matching
+        if (brand) {
+          map[String(brand).trim().toLowerCase() + '|' + String(produkt).trim().toLowerCase()] = entry;
+        }
+        // Also store produkt-only as fallback
+        map['|' + String(produkt).trim().toLowerCase()] = entry;
+      }
+      return map;
+    }
+
+    // Check for SnusCrew / SnusCorp named sheets
+    const crewSheet = wb.SheetNames.find(n => n.toLowerCase().includes('snuscrew'));
+    const corpSheet = wb.SheetNames.find(n => n.toLowerCase().includes('snuscorp'));
+
+    if (crewSheet || corpSheet) {
+      // Split tekstfil — load each sheet separately
+      state.textData = crewSheet ? parseTextSheet(wb.Sheets[crewSheet]) : {};
+      state.textDataCorp = corpSheet ? parseTextSheet(wb.Sheets[corpSheet]) : {};
+      const crewCount = Object.keys(state.textData).length;
+      const corpCount = Object.keys(state.textDataCorp).length;
+      addLog('ok', 'TEKST', `${file.name} — SnusCrew: ${crewCount} produkter · SnusCorp: ${corpCount} produkter`);
+    } else {
+      // Single sheet — use for both
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      state.textData = parseTextSheet(ws);
+      state.textDataCorp = state.textData;
+      const count = Object.keys(state.textData).length;
+      addLog('ok', 'TEKST', `${file.name} — ${count} produkter med SEO-tekster indlæst`);
+    }
+    state.textContent = 'xlsx';
+  } else if (name.endsWith('.txt')) {
+    state.textContent = await file.text();
+    state.textData = null;
+  } else if (name.endsWith('.docx')) {
+    try {
+      const data = await file.arrayBuffer();
+      const zip = await unzipDocx(data);
+      state.textContent = zip;
+      state.textData = null;
+    } catch(e) {
+      addLog('warn', 'TEKST', 'Kunne ikke læse .docx — prøv .txt eller .xlsx format');
+      return;
+    }
+  }
+  document.getElementById('text-name').textContent = file.name + ' ✓';
+  document.getElementById('zone-text').classList.add('has-file');
+  document.getElementById('text-badge').className = 'upload-badge';
+  document.getElementById('text-badge').textContent = '✓ INDLÆST';
+  checkReady();
+}
+
+async function unzipDocx(arrayBuffer) {
+  // Use XLSX's zip capability to read docx
+  const zip = new Uint8Array(arrayBuffer);
+  // Simple approach: find word/document.xml in the zip
+  const decoder = new TextDecoder();
+  const str = decoder.decode(zip);
+  // Extract w:t tags from the raw bytes (rough but works)
+  const xmlMatch = str.match(/word\/document\.xml[^P]*/);
+  if (!xmlMatch) return str;
+
+  // Better: use FileReader approach
+  const blob = new Blob([arrayBuffer]);
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      // Strip XML tags to get plain text
+      const text = result.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      resolve(text);
+    };
+    reader.readAsText(blob);
+  });
+}
+
+// ============================================================
+// BRAND LIST
+// ============================================================
+function buildBrandList() {
+  const brands = new Set();
+  if (state.metaData) {
+    for (const row of state.metaData) {
+      const b = row[102];
+      if (b && String(b).trim()) brands.add(String(b).trim());
+    }
+  }
+  state.brands = [...brands].sort();
+  state.selectedBrands = new Set();
+  state.selectedSkus = new Set();
+
+  const dropdown = document.getElementById('brand-dropdown');
+  dropdown.innerHTML = '<option value="">-- Vælg brand --</option>';
+  for (const brand of state.brands) {
+    const opt = document.createElement('option');
+    opt.value = brand;
+    opt.textContent = brand;
+    dropdown.appendChild(opt);
+  }
+
+  document.getElementById('sku-section').style.display = 'none';
+  document.getElementById('brand-placeholder').style.display = state.brands.length ? 'none' : 'block';
+  document.getElementById('brand-placeholder').textContent = state.brands.length
+    ? '' : 'Upload metadata-ark for at se brands...';
+
+  addLog('info', 'BRANDS', `${state.brands.length} brands fundet i metadata`);
+  document.getElementById('step2').classList.add('active');
+}
+
+function selectBrand(brand) {
+  state.selectedBrands = new Set();
+  state.selectedSkus = new Set();
+
+  if (!brand) {
+    document.getElementById('sku-section').style.display = 'none';
+    return;
+  }
+
+  state.selectedBrands.add(brand);
+
+  // Find all products for this brand from metadata
+  const skuGrid = document.getElementById('sku-grid');
+  skuGrid.innerHTML = '';
+  state.brandProducts = [];
+
+  for (const row of state.metaData) {
+    const rowBrand = row[102];
+    if (!rowBrand || String(rowBrand).trim() !== brand) continue;
+    const sku = row[1];
+    const name = row[2];
+    if (!sku || !name) continue;
+    state.brandProducts.push({ sku: String(sku), name });
+    state.selectedSkus.add(String(sku));
+  }
+
+  if (state.brandProducts.length === 0) {
+    skuGrid.innerHTML = '<div style="color:var(--muted);font-size:12px;">Ingen produkter fundet for dette brand</div>';
+    document.getElementById('sku-section').style.display = 'block';
+    return;
+  }
+
+  for (const product of state.brandProducts) {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--surface2); border-radius:6px; cursor:pointer; font-size:13px;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.value = product.sku;
+    cb.style.cssText = 'width:16px; height:16px; cursor:pointer; accent-color: #7c6ef5;';
+    cb.onchange = () => {
+      if (cb.checked) state.selectedSkus.add(product.sku);
+      else state.selectedSkus.delete(product.sku);
+    };
+    const label = document.createElement('span');
+    label.textContent = product.name;
+    row.appendChild(cb);
+    row.appendChild(label);
+    skuGrid.appendChild(row);
+  }
+
+  document.getElementById('sku-section').style.display = 'block';
+  addLog('info', 'BRAND', `${brand} valgt — ${state.brandProducts.length} produkter`);
+}
+
+function selectAllSkus() {
+  state.selectedSkus = new Set(state.brandProducts.map(p => p.sku));
+  document.querySelectorAll('#sku-grid input[type=checkbox]').forEach(cb => cb.checked = true);
+}
+
+function clearSkus() {
+  state.selectedSkus.clear();
+  document.querySelectorAll('#sku-grid input[type=checkbox]').forEach(cb => cb.checked = false);
+}
+
+function checkReady() {
+  const ready = state.metaData && state.priceData;
+  document.getElementById('gen-btn').disabled = !ready;
+  if (ready) document.getElementById('step3').classList.add('active');
+}
+
+// ============================================================
+// LOGGING
+// ============================================================
+function addLog(type, tag, msg) {
+  state.logLines.push({ type, tag, msg, time: new Date().toLocaleTimeString() });
+}
+
+// ============================================================
+// PRICE LOOKUP
+// ============================================================
+function buildPriceMap() {
+  const map = {};
+  const rows = state.priceData;
+  if (!rows || rows.length < 5) return map;
+
+  // Step 1: Find which column indices contain brand, pack, price
+  // by scanning rows for rows where one col has 1/10/40 and another has a price 1-999
+  let brandCol = -1, packCol = -1, priceCol = -1;
+
+  for (const row of rows) {
+    if (!row) continue;
+    // Find a row that has pack=1 AND a plausible price
+    let packIdx = -1, priceIdx = -1, brandIdx = -1;
+    for (let i = 0; i < row.length; i++) {
+      const v = row[i];
+      if (v === null || v === undefined || v === '') continue;
+      const n = parseFloat(String(v));
+      if (n === 1 && packIdx === -1) packIdx = i;
+      if (n > 1 && n < 500 && priceIdx === -1 && i !== packIdx) priceIdx = i;
+    }
+    // Brand col is the first string col before packCol
+    if (packIdx > 0 && priceIdx > 0) {
+      for (let i = 0; i < packIdx; i++) {
+        const v = row[i];
+        if (v && typeof v === 'string' && v.trim().length > 1 && isNaN(parseFloat(v))) {
+          const vl = v.toLowerCase();
+          if (!vl.includes('brand') && !vl.includes('category') && !vl.includes('catagory') && !vl.includes('sku') && !vl.includes('cost') && !vl.includes('nicotine')) {
+            brandIdx = i;
+            break;
+          }
+        }
+      }
+    }
+    if (brandIdx >= 0 && packIdx > 0 && priceIdx > 0) {
+      brandCol = brandIdx;
+      packCol = packIdx;
+      priceCol = priceIdx;
+      break;
+    }
+  }
+
+  addLog('info', 'DEBUG', `Kolonner fundet: brand=${brandCol}, pack=${packCol}, pris=${priceCol}`);
+  if (brandCol < 0 || packCol < 0 || priceCol < 0) {
+    addLog('warn', 'PRIS', 'Kunne ikke finde kolonner i prisarket automatisk');
+    return map;
+  }
+
+  // Step 2: Build map
+  for (const row of rows) {
+    if (!row) continue;
+    const brand = row[brandCol];
+    const pack = row[packCol];
+    const price = row[priceCol];
+
+    if (!brand || brand === '') continue;
+    const brandStr = String(brand).trim();
+    if (!brandStr || brandStr.length < 2) continue;
+    // Skip header-like rows
+    const bl = brandStr.toLowerCase();
+    if (bl.includes('brand') || bl.includes('sku') || bl.includes('margin') || bl.includes('nicotine') || bl.includes('catagory')) continue;
+
+    const packStr = String(pack).trim();
+    // Skip discount rows like "10_(1)" or "40_(1)" — only accept pure numbers
+    if (!/^\d+$/.test(packStr)) continue;
+    const packNum = parseInt(packStr);
+    const priceNum = parseFloat(String(price));
+    if (isNaN(packNum) || isNaN(priceNum) || priceNum <= 0) continue;
+
+    const key = brandStr.toLowerCase();
+    if (!map[key]) map[key] = {};
+    if (packNum === 1) map[key][1] = parseFloat(priceNum.toFixed(2));
+    else if (packNum === 10) map[key][10] = parseFloat(priceNum.toFixed(2));
+    else if (packNum === 40) map[key][40] = parseFloat(priceNum.toFixed(2));
+  }
+
+  return map;
+}
+
+// Noise words to ignore in brand matching
+const BRAND_NOISE = new Set(['nicotine','pouches','pouch','slim','white','black','original','mini','strong','x','and','the','of','by','ultra','super','plus','go','pro']);
+
+function brandScore(a, b) {
+  // Score how similar two brand names are (0-100)
+  const wordsA = a.toLowerCase().split(/[\s\-_]+/).filter(w => w.length > 1);
+  const wordsB = b.toLowerCase().split(/[\s\-_]+/).filter(w => w.length > 1);
+  // Key words = not noise
+  const keyA = wordsA.filter(w => !BRAND_NOISE.has(w));
+  const keyB = wordsB.filter(w => !BRAND_NOISE.has(w));
+  if (keyA.length === 0 || keyB.length === 0) return 0;
+  let matches = 0;
+  for (const w of keyA) {
+    if (keyB.some(k => k === w || k.startsWith(w) || w.startsWith(k))) matches++;
+  }
+  // Score: matches / max possible key words
+  return Math.round((matches / Math.max(keyA.length, keyB.length)) * 100);
+}
+
+function findPrice(priceMap, brandName) {
+  if (!brandName) return null;
+  const key = brandName.trim().toLowerCase();
+
+  // 1. Exact match
+  if (priceMap[key]) return priceMap[key];
+
+  // 2. Substring match
+  for (const k of Object.keys(priceMap)) {
+    if (key.includes(k) || k.includes(key)) return priceMap[k];
+  }
+
+  // 3. Smart word-based scoring — find best match
+  let bestScore = 0;
+  let bestKey = null;
+  for (const k of Object.keys(priceMap)) {
+    const score = brandScore(key, k);
+    if (score > bestScore) { bestScore = score; bestKey = k; }
+  }
+  // Accept if score is 50% or better
+  if (bestScore >= 50 && bestKey) return priceMap[bestKey];
+
+  return null;
+}
+
+// ============================================================
+// SEO TEXT PARSING
+// ============================================================
+function parseSeoTexts(content) {
+  if (!content) return {};
+  const products = {};
+  // Split by product name headers (bold or all-caps lines)
+  const sections = content.split(/\n(?=[A-Z][A-Z\s]+[A-Z]\n)/);
+
+  // Try to extract by product name blocks
+  const lines = content.split('\n');
+  let currentProduct = null;
+  let currentData = {};
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Detect product title (bold markers or standalone title line)
+    const titleMatch = line.match(/^\*\*(.+?)\*\*$/) || line.match(/^([A-Z][^.!?]{5,50})$/);
+    if (titleMatch) {
+      if (currentProduct) products[currentProduct.toLowerCase()] = currentData;
+      currentProduct = (titleMatch[1] || titleMatch[0]).replace(/\*\*/g, '').trim();
+      currentData = {};
+      continue;
+    }
+
+    // SEO Page Title
+    if (line.match(/SEO Page Title|SEO Headline/i)) {
+      const next = lines[i+1] ? lines[i+1].trim() : '';
+      if (next && !next.match(/^\d+\./)) {
+        currentData.seoTitle = next.replace(/\*\*/g, '');
+        i++;
+      }
+      continue;
+    }
+
+    // Meta Description
+    if (line.match(/Meta Description/i)) {
+      const next = lines[i+1] ? lines[i+1].trim() : '';
+      if (next && !next.match(/^\d+\./)) {
+        currentData.metaDesc = next.replace(/\*\*/g, '');
+        i++;
+      }
+      continue;
+    }
+
+    // Numbered sections
+    if (line.match(/^2\.\s+SEO Page Title/i)) {
+      const val = line.replace(/^2\.\s+SEO Page Title\s*/i, '').trim();
+      if (val) currentData.seoTitle = val.replace(/\*\*/g, '');
+      else if (lines[i+1]) { currentData.seoTitle = lines[i+1].trim().replace(/\*\*/g, ''); i++; }
+      continue;
+    }
+    if (line.match(/^3\.\s+Meta Description/i)) {
+      const val = line.replace(/^3\.\s+Meta Description\s*/i, '').trim();
+      if (val) currentData.metaDesc = val.replace(/\*\*/g, '');
+      else if (lines[i+1]) { currentData.metaDesc = lines[i+1].trim().replace(/\*\*/g, ''); i++; }
+      continue;
+    }
+  }
+  if (currentProduct) products[currentProduct.toLowerCase()] = currentData;
+  return products;
+}
+
+function toHtml(text) {
+  if (!text) return null;
+  // Double newline = new paragraph, single newline = line break
+  return '<p>' + text
+    .replace(/\r\n/g, '\n')
+    .replace(/\n\n+/g, '</p><p>')
+    .replace(/\n/g, '<br>') + '</p>';
+}
+
+function matchTextData(map, productTitle, brandName) {
+  if (!map || !productTitle) return {};
+  const title = productTitle.toLowerCase();
+  const brand = (brandName || '').toLowerCase();
+
+  // 1. Brand + produkt exact: brand|produkt key both contained in title
+  for (const key of Object.keys(map)) {
+    if (!key.includes('|')) continue;
+    const [kb, kp] = key.split('|');
+    if (!kb) continue; // skip fallback keys
+    if (title.includes(kp) && brand.includes(kb)) return map[key];
+  }
+
+  // 2. Brand + produkt word match
+  for (const key of Object.keys(map)) {
+    if (!key.includes('|')) continue;
+    const [kb, kp] = key.split('|');
+    if (!kb) continue;
+    if (!brand.includes(kb)) continue;
+    const words = kp.split(/\s+/).filter(w => w.length > 3);
+    if (words.length > 0 && words.every(w => title.includes(w))) return map[key];
+  }
+
+  return {};
+}
+
+function findSeoDataCorp(productTitle, brandName) {
+  const corpMap = state.textDataCorp || state.textData;
+  if (!corpMap) return {};
+  return matchTextData(corpMap, productTitle, brandName);
+}
+
+function findSeoData(seoMap, productTitle, brandName) {
+  if (state.textData) {
+    return matchTextData(state.textData, productTitle, brandName);
+  }
+  if (!seoMap || !productTitle) return {};
+  const title = productTitle.toLowerCase();
+  for (const key of Object.keys(seoMap)) {
+    if (title.includes(key) || key.includes(title)) return seoMap[key];
+  }
+  const words = title.split(/\s+/).filter(w => w.length > 3);
+  for (const key of Object.keys(seoMap)) {
+    const matched = words.filter(w => key.includes(w)).length;
+    if (matched >= 2) return seoMap[key];
+  }
+  return {};
+}
+
+// ============================================================
+// HANDLE GENERATION
+// ============================================================
+function setProgress(pct) {
+  document.getElementById('progress-bar').style.display = 'block';
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+// ZEUS column headers (exactly as in template)
+const ZEUS_HEADERS = [
+  'Handle','Title','Body (HTML)','Product Info (product.metafields.custom.product_info)','Vendor','Product Category','Type','Tags','Published',
+  'Option1 Name','Option1 Value','Option1 Linked To','Option2 Name','Option2 Value','Option2 Linked To',
+  'Option3 Name','Option3 Value','Option3 Linked To','Variant SKU','Variant Grams',
+  'Variant Inventory Tracker','Variant Inventory Policy','Variant Fulfillment Service',
+  'Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable',
+  'Unit Price Total Measure','Unit Price Total Measure Unit','Unit Price Base Measure','Unit Price Base Measure Unit',
+  'Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card',
+  'SEO Title','SEO Description',
+  'Google Shopping / Google Product Category','Google Shopping / Gender','Google Shopping / Age Group',
+  'Google Shopping / MPN','Google Shopping / Condition','Google Shopping / Custom Product',
+  'Google Shopping / Custom Label 0','Google Shopping / Custom Label 1','Google Shopping / Custom Label 2',
+  'Google Shopping / Custom Label 3','Google Shopping / Custom Label 4',
+  'Format (product.metafields.custom.format)',
+  'Ingredients (product.metafields.custom.ingredients)',
+  'Manufacturer (product.metafields.custom.manufacturer)',
+  'Nicotine strength per pouch (mg) (product.metafields.custom.nicotine_strength_per_pouch_mg_)',
+  'Nicotine strenth (mg/g) (product.metafields.custom.nicotine_strenth_mg_g_)',
+  'Pouches per can (product.metafields.custom.pouches_per_can)',
+  'Name (product.metafields.custom.product_name)',
+  'Strength (product.metafields.custom.strength)',
+  'Taste profile (product.metafields.custom.taste_profile)',
+  'UFI code (product.metafields.custom.ufi_code)',
+  'Weight per pouch (product.metafields.custom.weight_per_pouch)',
+  'Custom Badge (product.metafields.custom_badge.title)',
+  'Google: Custom Product (product.metafields.mm-google-shopping.custom_product)',
+  'Drikkevareproduktform (product.metafields.shopify.beverage-product-form)',
+  'Pakketype (product.metafields.shopify.package-type)',
+  'Supplerende produkter (product.metafields.shopify--discovery--product_recommendation.complementary_products)',
+  'Relaterede produkter (product.metafields.shopify--discovery--product_recommendation.related_products)',
+  'Relaterede produktindstillinger (product.metafields.shopify--discovery--product_recommendation.related_products_display)',
+  'Søg efter produktboosts (product.metafields.shopify--discovery--product_search_boost.queries)',
+  'Variant Image','Variant Weight Unit','Variant Tax Code','Cost per item','Status'
+];
+
+// SnusCorp column headers (76 columns — extra Variant Inventory Qty + danish metafields)
+const SNUSCORP_HEADERS = [
+  'Handle','Title','Body (HTML)','Vendor','Product Category','Type','Tags','Published',
+  'Option1 Name','Option1 Value','Option1 Linked To',
+  'Option2 Name','Option2 Value','Option2 Linked To',
+  'Option3 Name','Option3 Value','Option3 Linked To',
+  'Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Qty',
+  'Variant Inventory Policy','Variant Fulfillment Service',
+  'Variant Price','Variant Compare At Price',
+  'Variant Requires Shipping','Variant Taxable',
+  'Unit Price Total Measure','Unit Price Total Measure Unit',
+  'Unit Price Base Measure','Unit Price Base Measure Unit',
+  'Variant Barcode',
+  'Image Src','Image Position','Image Alt Text','Gift Card',
+  'SEO Title','SEO Description',
+  'Google Shopping / Google Product Category','Google Shopping / Gender',
+  'Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition',
+  'Google Shopping / Custom Product','Google Shopping / Custom Label 0',
+  'Google Shopping / Custom Label 1','Google Shopping / Custom Label 2',
+  'Google Shopping / Custom Label 3','Google Shopping / Custom Label 4',
+  'Batterikapacitet (product.metafields.custom.batterikapacitet)',
+  'Expiration date (product.metafields.custom.expiration_date)',
+  'Format (product.metafields.custom.format)',
+  'Indhold i gram (product.metafields.custom.indhold_i_gram)',
+  'Indhold i ml. (product.metafields.custom.inhalt_in_ml_)',
+  'Nikotinstyrke (mg/g) (product.metafields.custom.nikotinstyrke)',
+  'Nikotinindhold (product.metafields.custom.nikotinst_rke)',
+  'Pouches per dåse (product.metafields.custom.pouches_per_daase)',
+  'Producent (product.metafields.custom.producent)',
+  'Short description (product.metafields.custom.short_description)',
+  'Show Non returnable badge (product.metafields.custom.show_non_returnable_badge)',
+  'Smag (product.metafields.custom.smag)',
+  'Styrke (product.metafields.custom.styrke)',
+  'Type (product.metafields.custom.type)',
+  'Vægt per pouch (g) (product.metafields.custom.vaegt_per_pouch)',
+  'Antal puffs (product.metafields.custom.z_ge_puffs)',
+  'Google: Custom Product (product.metafields.mm-google-shopping.custom_product)',
+  'E-cigaret/damp-format (product.metafields.shopify.e-cigarette-vaporizer-style)',
+  'Supplerende produkter (product.metafields.shopify--discovery--product_recommendation.complementary_products)',
+  'Relaterede produkter (product.metafields.shopify--discovery--product_recommendation.related_products)',
+  'Relaterede produktindstillinger (product.metafields.shopify--discovery--product_recommendation.related_products_display)',
+  'Søg efter produktboosts (product.metafields.shopify--discovery--product_search_boost.queries)',
+  'Variant Image','Variant Weight Unit','Variant Tax Code','Cost per item','Status'
+];
+
+function makeHandle(title) {
+  return title.toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9\-&]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function generateTags(brand, title, strength, format, taste) {
+  const tags = new Set();
+  if (brand) tags.add(brand.toLowerCase());
+  tags.add('nicotine pouches');
+  if (format) tags.add(format.toLowerCase());
+  if (strength) tags.add(strength.toLowerCase());
+  if (taste) tags.add(taste.toLowerCase());
+
+  // Extract words from title
+  const stopWords = new Set(['mg', 'and', 'the', 'for', 'with']);
+  const words = title.toLowerCase().split(/[\s\-_]+/);
+  for (const w of words) {
+    if (w.length > 2 && !stopWords.has(w) && !/^\d/.test(w)) tags.add(w);
+  }
+
+  // Taste categories
+  const tasteMap = {
+    mint: ['mint', 'menthol', 'peppermint', 'cool', 'freeze', 'ice', 'arctic'],
+    berry: ['berry', 'blueberry', 'strawberry', 'raspberry', 'blackcurrant', 'cherry'],
+    fruity: ['mango', 'citrus', 'lemon', 'lime', 'orange', 'apple', 'peach', 'watermelon', 'kiwi'],
+    candy: ['candy', 'cola', 'bubblegum', 'sweet'],
+    drink: ['coffee', 'espresso', 'energy', 'rum', 'bourbon', 'whiskey'],
+    mixed: ['mixed', 'fusion', 'blend']
+  };
+  const titleLower = title.toLowerCase();
+  for (const [cat, keywords] of Object.entries(tasteMap)) {
+    if (keywords.some(k => titleLower.includes(k))) tags.add(cat);
+  }
+
+  return [...tags].join(', ');
+}
+
+function getMH(row, idx) {
+  // Get metadata header index by column letter
+  return row[idx] ?? null;
+}
+
+function fmt(val) {
+  if (val === null || val === undefined) return null;
+  return val;
+}
+
+function fmtNum(val) {
+  if (val === null || val === undefined) return null;
+  const n = parseFloat(String(val).replace(',', '.'));
+  return isNaN(n) ? null : parseFloat(n.toFixed(2));
+}
+
+
+function buildCorpRows(params) {
+  const {
+    handle, name, brandNormalized, tags, seoData,
+    sku1, sku10, sku40,
+    grams1, grams10, grams40,
+    price1, price10, price40, compareAt10, compareAt40,
+    gtin, format, mgG, mgPouch, pouches, pouchW, manufacturer, strength, taste
+  } = params;
+
+  const C = {};
+  SNUSCORP_HEADERS.forEach((h, i) => { C[h] = i; });
+  function emptyRow() { return new Array(SNUSCORP_HEADERS.length).fill(null); }
+
+  // SnusCorp uses plain strings/numbers — NO apostrophe prefix
+  function corpNum(val) {
+    if (val === null || val === undefined) return null;
+    const n = parseFloat(String(val).replace(',','.'));
+    return isNaN(n) ? null : String(n);
+  }
+  function corpInt(val) {
+    if (val === null || val === undefined) return null;
+    const n = parseInt(val);
+    return isNaN(n) ? null : n;
+  }
+
+  // --- ROW 1: 1-pack (master) ---
+  const r1 = emptyRow();
+  r1[C['Handle']] = handle;
+  r1[C['Title']] = name;
+  r1[C['Body (HTML)']] = (seoData.seoHeadline || seoData.longDesc)
+    ? (seoData.seoHeadline ? '<h1>' + seoData.seoHeadline + '</h1>' : '') + (seoData.longDesc ? '<br>' + toHtml(seoData.longDesc) : '')
+    : null;
+  r1[C['Vendor']] = brandNormalized;
+  r1[C['Product Category']] = 'Food, Beverages & Tobacco';
+  r1[C['Type']] = 'Nicotine Pouches';
+  r1[C['Tags']] = tags;
+  r1[C['Published']] = 'true';
+  r1[C['Option1 Name']] = name;
+  r1[C['Option1 Value']] = '1-pack';
+  r1[C['Variant SKU']] = sku1;
+  r1[C['Variant Grams']] = grams1 != null ? String(grams1).replace(',','.') : null;
+  r1[C['Variant Inventory Tracker']] = 'shopify';
+  r1[C['Variant Inventory Policy']] = 'deny';
+  r1[C['Variant Fulfillment Service']] = 'manual';
+  r1[C['Variant Price']] = price1 != null ? String(price1).replace(',','.') : null;
+  r1[C['Variant Compare At Price']] = null;
+  r1[C['Variant Requires Shipping']] = 'true';
+  r1[C['Variant Taxable']] = 'true';
+  r1[C['Variant Barcode']] = gtin ? String(gtin) : null;
+  r1[C['Image Position']] = '1';
+  r1[C['Gift Card']] = 'false';
+  r1[C['SEO Title']] = seoData.seoTitle || null;
+  r1[C['SEO Description']] = seoData.metaDesc || null;
+  r1[C['Google Shopping / Google Product Category']] = '412';
+  r1[C['Format (product.metafields.custom.format)']] = format ? format.toLowerCase() : null;
+  r1[C['Nikotinstyrke (mg/g) (product.metafields.custom.nikotinstyrke)']] = mgG != null ? String(mgG).replace(',','.') : null;
+  r1[C['Nikotinindhold (product.metafields.custom.nikotinst_rke)']] = mgPouch != null ? String(mgPouch).replace(',','.') : null;
+  r1[C['Pouches per dåse (product.metafields.custom.pouches_per_daase)']] = pouches != null ? String(pouches).replace(',','.') : null;
+  r1[C['Producent (product.metafields.custom.producent)']] = manufacturer || null;
+  r1[C['Short description (product.metafields.custom.short_description)']] = seoData.shortDesc || null;
+  r1[C['Smag (product.metafields.custom.smag)']] = taste || null;
+  r1[C['Styrke (product.metafields.custom.styrke)']] = strength || null;
+  r1[C['Type (product.metafields.custom.type)']] = 'Nicotine Pouches';
+  r1[C['Vægt per pouch (g) (product.metafields.custom.vaegt_per_pouch)']] = pouchW != null ? String(pouchW).replace(',','.') : null;
+  r1[C['Variant Weight Unit']] = 'g';
+  r1[C['Status']] = 'draft';
+
+  // --- ROW 2: 10-pack (variant) ---
+  const r2 = emptyRow();
+  r2[C['Handle']] = handle;
+  r2[C['Option1 Name']] = name;
+  r2[C['Option1 Value']] = '10-pack';
+  r2[C['Variant SKU']] = sku10;
+  r2[C['Variant Grams']] = grams10 != null ? String(grams10).replace(',','.') : null;
+  r2[C['Variant Inventory Tracker']] = 'shopify';
+  r2[C['Variant Inventory Policy']] = 'deny';
+  r2[C['Variant Fulfillment Service']] = 'manual';
+  r2[C['Variant Price']] = price10 != null ? String(price10).replace(',','.') : null;
+  r2[C['Variant Compare At Price']] = compareAt10 != null ? String(compareAt10).replace(',','.') : null;
+  r2[C['Variant Requires Shipping']] = 'true';
+  r2[C['Variant Taxable']] = 'true';
+  r2[C['Variant Barcode']] = gtin ? String(gtin) : null;
+  r2[C['Variant Weight Unit']] = 'g';
+
+  // --- ROW 3: 40-pack (variant) ---
+  const r3 = emptyRow();
+  r3[C['Handle']] = handle;
+  r3[C['Option1 Name']] = name;
+  r3[C['Option1 Value']] = '40-pack';
+  r3[C['Variant SKU']] = sku40;
+  r3[C['Variant Grams']] = grams40 != null ? String(grams40).replace(',','.') : null;
+  r3[C['Variant Inventory Tracker']] = 'shopify';
+  r3[C['Variant Inventory Policy']] = 'deny';
+  r3[C['Variant Fulfillment Service']] = 'manual';
+  r3[C['Variant Price']] = price40 != null ? String(price40).replace(',','.') : null;
+  r3[C['Variant Compare At Price']] = compareAt40 != null ? String(compareAt40).replace(',','.') : null;
+  r3[C['Variant Requires Shipping']] = 'true';
+  r3[C['Variant Taxable']] = 'true';
+  r3[C['Variant Barcode']] = gtin ? String(gtin) : null;
+  r3[C['Variant Weight Unit']] = 'g';
+
+  return [r1, r2, r3];
+}
+
+
+
+function selectPriceSheet(sheetName) {
+  if (!state.priceWB) return;
+  const ws = state.priceWB.Sheets[sheetName];
+  if (!ws) return;
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  state.priceData = rows;
+  document.getElementById('price-name').textContent =
+    document.getElementById('price-sheet-select').closest('.upload-info').querySelector('.upload-filename').textContent.split(' ·')[0]
+    + ` · ark: "${sheetName}" (${rows.length} rækker)`;
+  addLog('ok', 'PRIS', `Ark skiftet til "${sheetName}" — ${rows.length} rækker indlæst`);
+  checkReady();
+}
+
+function forceTextCells(ws) {
+  // Force all cells that look like numbers/barcodes to be text type
+  // This prevents Excel from mangling decimals and long numbers
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  for (let r = range.s.r + 1; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({r, c});
+      const cell = ws[addr];
+      if (!cell || cell.t !== 'n') continue;
+      // Convert numeric cells to text
+      cell.t = 's';
+      cell.v = String(cell.v);
+      delete cell.w;
+    }
+  }
+}
+
+async function generate() {
+  document.getElementById('gen-btn').disabled = true;
+  document.getElementById('output-section').style.display = 'none';
+  state.logLines = [];
+  state.stats = { ok: 0, warn: 0, error: 0, skipped: 0 };
+  try {
+
+  setProgress(5);
+  addLog('info', 'START', 'Generering påbegyndt...');
+
+  // Build price map
+  if (state.priceData && state.priceData.length > 4) {
+    const r = state.priceData[4];
+    addLog('info', 'DEBUG', `Prisark rad 5: B=${JSON.stringify(r[1])} D=${JSON.stringify(r[3])}(${typeof r[3]}) E=${JSON.stringify(r[4])}(${typeof r[4]})`);
+  }
+  const priceMap = buildPriceMap();
+  addLog('info', 'PRIS', `Prismap bygget — ${Object.keys(priceMap).length} brands: ${Object.keys(priceMap).slice(0,8).join(', ')}`);
+  setProgress(15);
+
+  // Parse SEO texts
+  const seoMap = (state.textContent && state.textContent !== 'xlsx') ? parseSeoTexts(state.textContent) : {};
+  if (state.textData) {
+    addLog('info', 'SEO', `SEO-tekster klar — ${Object.keys(state.textData).length} produkter fra XLSX`);
+  } else if (state.textContent) {
+    addLog('info', 'SEO', `SEO-tekster parseret — ${Object.keys(seoMap).length} produkter matched`);
+  }
+  setProgress(20);
+
+  // Pre-check: find selected products with missing prices or texts
+  const missingPrices = new Set();
+  const missingTexts = new Set();
+  for (const row of state.metaData) {
+    const sku = row[1], name = row[2], brand = row[102];
+    if (!sku || !name || !brand) continue;
+    const brandKey = String(brand).trim();
+    const isSelected = [...state.selectedBrands].some(b =>
+      b.toLowerCase() === brandKey.toLowerCase() || brandKey.toLowerCase().includes(b.toLowerCase()) || b.toLowerCase().includes(brandKey.toLowerCase())
+    );
+    if (state.selectedBrands.size > 0 && !isSelected) continue;
+    if (state.selectedSkus.size > 0 && !state.selectedSkus.has(String(sku))) continue;
+    const prices = findPrice(priceMap, brandKey);
+    if (!prices || !prices[1]) missingPrices.add(name);
+    if (state.textData || state.textDataCorp) {
+      const seo = findSeoData(seoMap, name, brandKey);
+      if (!seo.seoTitle && !seo.shortDesc && !seo.longDesc) missingTexts.add(name);
+    }
+  }
+
+  if (missingPrices.size > 0 || missingTexts.size > 0) {
+    const proceed = await new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(27,59,106,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+      let sections = '';
+      if (missingPrices.size > 0) {
+        const list = [...missingPrices].join('\n• ');
+        sections += `
+          <div style="margin-bottom:16px;">
+            <div style="font-size:14px;font-weight:600;color:#1b3b6a;margin-bottom:6px;">💰 Ingen pris fundet (${missingPrices.size} produkt${missingPrices.size > 1 ? 'er' : ''}):</div>
+            <div style="background:#fff4f0;border-radius:8px;padding:10px;font-size:12px;color:#1b3b6a;white-space:pre-wrap;max-height:120px;overflow-y:auto;">• ${list}</div>
+            <div style="font-size:12px;color:#6b8aaa;margin-top:4px;">Prisfelterne vil være tomme.</div>
+          </div>`;
+      }
+      if (missingTexts.size > 0) {
+        const list = [...missingTexts].join('\n• ');
+        sections += `
+          <div style="margin-bottom:16px;">
+            <div style="font-size:14px;font-weight:600;color:#1b3b6a;margin-bottom:6px;">📝 Ingen tekster fundet (${missingTexts.size} produkt${missingTexts.size > 1 ? 'er' : ''}):</div>
+            <div style="background:#f0f4f8;border-radius:8px;padding:10px;font-size:12px;color:#1b3b6a;white-space:pre-wrap;max-height:120px;overflow-y:auto;">• ${list}</div>
+            <div style="font-size:12px;color:#6b8aaa;margin-top:4px;">SEO og beskrivelser efterlades tomme.</div>
+          </div>`;
+      }
+
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:16px;padding:32px;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(27,59,106,0.2);max-height:90vh;overflow-y:auto;">
+          <div style="font-size:20px;font-weight:700;color:#1b3b6a;margin-bottom:20px;">⚠️ Tjek inden generering</div>
+          ${sections}
+          <div style="color:#6b8aaa;font-size:13px;margin-bottom:24px;">Vil du fortsætte alligevel?</div>
+          <div style="display:flex;gap:12px;">
+            <button id="dlg-no" style="flex:1;padding:12px;border:2px solid #d0d7e8;border-radius:8px;background:#fff;color:#1b3b6a;font-size:14px;font-weight:600;cursor:pointer;">Nej, gå tilbage</button>
+            <button id="dlg-yes" style="flex:1;padding:12px;border:none;border-radius:8px;background:#1b3b6a;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Ja, fortsæt</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      document.getElementById('dlg-yes').onclick = () => { document.body.removeChild(overlay); resolve(true); };
+      document.getElementById('dlg-no').onclick = () => { document.body.removeChild(overlay); resolve(false); };
+    });
+    if (!proceed) { document.getElementById('gen-btn').disabled = false; return; }
+  }
+
+  // Metadata column indices (0-based)
+  // B=1(SKU), C=2(Name), H=7(GTIN), Y=24(NetWeight), CY=102(Brand), CZ=103(mg/g),
+  // DA=104(Format), DB=105(mg/pouch), DC=106(Pouches/can), DD=107(PouchWeight),
+  // DE=108(Strength), DF=109(Taste), DG=110(Manufacturer), DH=111(Ingredients), DI=112(UFI)
+  const CI = {
+    SKU: 1, NAME: 2, GTIN: 7, NETWEIGHT: 25,
+    BRAND: 102, MGG: 103, FORMAT: 104, MGPOUCH: 105,
+    POUCHES: 106, POUCHW: 107, STRENGTH: 108, TASTE: 109,
+    MANUFACTURER: 110, INGREDIENTS: 111, UFI: 112
+  };
+
+  const outputRows = [ZEUS_HEADERS];
+  const corpRows = [SNUSCORP_HEADERS];
+  let productCount = 0;
+  let skippedCount = 0;
+
+  // Group metadata by brand
+  const metaByBrand = {};
+  for (const row of state.metaData) {
+    const brand = row[CI.BRAND];
+    if (!brand) continue;
+    const brandKey = brand.trim().toLowerCase();
+    if (!metaByBrand[brandKey]) metaByBrand[brandKey] = [];
+    metaByBrand[brandKey].push(row);
+  }
+
+  setProgress(30);
+
+  // Process each metadata row
+  let processed = 0;
+  for (const row of state.metaData) {
+    processed++;
+    if (processed % 50 === 0) setProgress(30 + (processed / state.metaData.length) * 60);
+
+    const sku = row[CI.SKU];
+    const name = row[CI.NAME];
+    const brand = row[CI.BRAND];
+
+    if (!sku || !name) continue;
+    if (!brand) {
+      addLog('warn', 'SKIP', `${sku} — ${name}: Brand mangler i metadata`);
+      state.stats.warn++;
+      skippedCount++;
+      continue;
+    }
+
+    const brandKey = brand.trim().toLowerCase();
+
+    // Check if brand is selected
+    const brandNormalized = brand.trim();
+    const isSelected = [...state.selectedBrands].some(b =>
+      b.toLowerCase() === brandKey || brandKey.includes(b.toLowerCase()) || b.toLowerCase().includes(brandKey)
+    );
+    if (state.selectedBrands.size > 0 && !isSelected) {
+      skippedCount++;
+      continue;
+    }
+    // Check if specific SKU is selected
+    if (state.selectedSkus.size > 0 && !state.selectedSkus.has(String(sku))) {
+      skippedCount++;
+      continue;
+    }
+
+    // Get prices
+    const prices = findPrice(priceMap, brandNormalized);
+
+    const price1 = prices ? (prices[1] || null) : null;
+    const price10 = prices ? (prices[10] || null) : null;
+    const price40 = prices ? (prices[40] || null) : null;
+    const compareAt10 = (price1 && price10) ? parseFloat((price1 * 10).toFixed(2)) : null;
+    const compareAt40 = (price1 && price40) ? parseFloat((price1 * 40).toFixed(2)) : null;
+
+    // Build data
+    const gtin = row[CI.GTIN];
+    const netWeight = fmtNum(row[CI.NETWEIGHT]) || 0;
+    const format = row[CI.FORMAT] || '';
+    const strength = row[CI.STRENGTH] || '';
+    const taste = row[CI.TASTE] || '';
+    const manufacturer = row[CI.MANUFACTURER] || '';
+    const ingredients = row[CI.INGREDIENTS] || '';
+    const ufi = row[CI.UFI] || '';
+    const mgG = fmtNum(row[CI.MGG]);
+    const mgPouch = fmtNum(row[CI.MGPOUCH]);
+    const pouches = fmtNum(row[CI.POUCHES]);
+    const pouchW = fmtNum(row[CI.POUCHW]);
+
+    const handle = makeHandle(name);
+    const tags = generateTags(brandNormalized, name, strength, format, taste);
+    const seoData = findSeoData(seoMap, name, brandNormalized);
+
+    const skuBase = String(sku);
+    const sku1 = skuBase + '-1';
+    const sku10 = skuBase + '-10';
+    const sku40 = skuBase + '-40';
+
+    const grams1 = netWeight > 0 ? parseFloat(netWeight.toFixed(2)) : null;
+    const grams10 = netWeight > 0 ? parseFloat((netWeight * 10).toFixed(2)) : null;
+    const grams40 = netWeight > 0 ? parseFloat((netWeight * 40).toFixed(2)) : null;
+
+    // Helper: build empty row of correct length
+    function emptyRow() { return new Array(ZEUS_HEADERS.length).fill(null); }
+
+    // Col index helper
+    const C = {};
+    ZEUS_HEADERS.forEach((h, i) => { C[h] = i; });
+
+    // --- ROW 1: 1-pack (master) ---
+    const r1 = emptyRow();
+    r1[C['Handle']] = handle;
+    r1[C['Title']] = name;
+    r1[C['Body (HTML)']] = seoData.shortDesc ? toHtml(seoData.shortDesc) : null;
+    r1[C['Product Info (product.metafields.custom.product_info)']] = (seoData.seoHeadline || seoData.longDesc)
+      ? (seoData.seoHeadline ? '<h1>' + seoData.seoHeadline + '</h1>' : '') + (seoData.longDesc ? '<br>' + toHtml(seoData.longDesc) : '')
+      : null;
+    r1[C['Vendor']] = brandNormalized;
+    r1[C['Product Category']] = 'Food, Beverages & Tobacco';
+    r1[C['Type']] = 'Nicotine Pouches';
+    r1[C['Tags']] = tags;
+    r1[C['Published']] = 'true';
+    r1[C['Option1 Name']] = name;
+    r1[C['Option1 Value']] = '1-pack';
+    r1[C['Variant SKU']] = sku1;
+    r1[C['Variant Grams']] = grams1 != null ? String(grams1).replace(',','.') : null;
+    r1[C['Variant Inventory Tracker']] = 'shopify';
+    r1[C['Variant Inventory Policy']] = 'deny';
+    r1[C['Variant Fulfillment Service']] = 'manual';
+    r1[C['Variant Price']] = price1 != null ? String(price1).replace(',','.') : null;
+    r1[C['Variant Compare At Price']] = null;
+    r1[C['Variant Requires Shipping']] = 'true';
+    r1[C['Variant Taxable']] = 'true';
+    r1[C['Variant Barcode']] = gtin ? String(gtin) : null;
+    r1[C['Image Position']] = '1';
+    r1[C['Gift Card']] = 'false';
+    r1[C['SEO Title']] = seoData.seoTitle || null;
+    r1[C['SEO Description']] = seoData.metaDesc || null;
+    r1[C['Google Shopping / Google Product Category']] = '412';
+    r1[C['Format (product.metafields.custom.format)']] = format ? format.toLowerCase() : null;
+    r1[C['Ingredients (product.metafields.custom.ingredients)']] = ingredients || null;
+    r1[C['Manufacturer (product.metafields.custom.manufacturer)']] = manufacturer || null;
+    r1[C['Nicotine strength per pouch (mg) (product.metafields.custom.nicotine_strength_per_pouch_mg_)']] = mgPouch != null ? String(mgPouch).replace(',','.') : null;
+    r1[C['Nicotine strenth (mg/g) (product.metafields.custom.nicotine_strenth_mg_g_)']] = mgG != null ? String(mgG).replace(',','.') : null;
+    r1[C['Pouches per can (product.metafields.custom.pouches_per_can)']] = pouches != null ? String(pouches).replace(',','.') : null;
+    r1[C['Name (product.metafields.custom.product_name)']] = name;
+    r1[C['Strength (product.metafields.custom.strength)']] = strength || null;
+    r1[C['Taste profile (product.metafields.custom.taste_profile)']] = taste || null;
+    r1[C['UFI code (product.metafields.custom.ufi_code)']] = ufi || null;
+    r1[C['Weight per pouch (product.metafields.custom.weight_per_pouch)']] = pouchW != null ? String(pouchW).replace(',','.') : null;
+    r1[C['Variant Weight Unit']] = 'g';
+    r1[C['Status']] = 'draft';
+
+    // --- ROW 2: 10-pack (variant) ---
+    const r2 = emptyRow();
+    r2[C['Handle']] = handle;
+    r2[C['Option1 Name']] = name;
+    r2[C['Option1 Value']] = '10-pack';
+    r2[C['Variant SKU']] = sku10;
+    r2[C['Variant Grams']] = grams10 != null ? String(grams10).replace(',','.') : null;
+    r2[C['Variant Inventory Tracker']] = 'shopify';
+    r2[C['Variant Inventory Policy']] = 'deny';
+    r2[C['Variant Fulfillment Service']] = 'manual';
+    r2[C['Variant Price']] = price10 != null ? String(price10).replace(',','.') : null;
+    r2[C['Variant Compare At Price']] = compareAt10 != null ? String(compareAt10).replace(',','.') : null;
+    r2[C['Variant Requires Shipping']] = 'true';
+    r2[C['Variant Taxable']] = 'true';
+    r2[C['Variant Barcode']] = gtin ? String(gtin) : null;
+    r2[C['Variant Weight Unit']] = 'g';
+
+    // --- ROW 3: 40-pack (variant) ---
+    const r3 = emptyRow();
+    r3[C['Handle']] = handle;
+    r3[C['Option1 Name']] = name;
+    r3[C['Option1 Value']] = '40-pack';
+    r3[C['Variant SKU']] = sku40;
+    r3[C['Variant Grams']] = grams40 != null ? String(grams40).replace(',','.') : null;
+    r3[C['Variant Inventory Tracker']] = 'shopify';
+    r3[C['Variant Inventory Policy']] = 'deny';
+    r3[C['Variant Fulfillment Service']] = 'manual';
+    r3[C['Variant Price']] = price40 != null ? String(price40).replace(',','.') : null;
+    r3[C['Variant Compare At Price']] = compareAt40 != null ? String(compareAt40).replace(',','.') : null;
+    r3[C['Variant Requires Shipping']] = 'true';
+    r3[C['Variant Taxable']] = 'true';
+    r3[C['Variant Barcode']] = gtin ? String(gtin) : null;
+    r3[C['Variant Weight Unit']] = 'g';
+
+    outputRows.push(r1, r2, r3);
+
+    // Build SnusCorp rows
+    try {
+      const seoDataCorp = findSeoDataCorp(name, brandNormalized);
+      const corpParams = {
+        handle, name, brandNormalized, tags, seoData: seoDataCorp,
+        sku1, sku10, sku40, grams1, grams10, grams40,
+        price1, price10, price40, compareAt10, compareAt40,
+        gtin, format, mgG, mgPouch, pouches, pouchW, manufacturer, strength, taste
+      };
+      const [cr1, cr2, cr3] = buildCorpRows(corpParams);
+      corpRows.push(cr1, cr2, cr3);
+    } catch(e) {
+      addLog('warn', 'CORP', `${name}: SnusCorp-række fejlede — ${e.message}`);
+    }
+
+    productCount++;
+    state.stats.ok++;
+
+    if (productCount <= 5 || !seoData.seoTitle) {
+      if (!seoData.seoTitle && state.textContent) {
+        addLog('warn', 'SEO', `${name}: Ingen SEO-tekst fundet i tekstfil`);
+        state.stats.warn++;
+      }
+    }
+  }
+
+  setProgress(95);
+
+  // Build workbooks
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(outputRows);
+  forceTextCells(ws);
+  XLSX.utils.book_append_sheet(wb, ws, 'Shopify Import');
+  state.outputWB = wb;
+
+  const wbCorp = XLSX.utils.book_new();
+  const wsCorp = XLSX.utils.aoa_to_sheet(corpRows);
+  forceTextCells(wsCorp);
+  XLSX.utils.book_append_sheet(wbCorp, wsCorp, 'Shopify Import');
+  state.outputWBCorp = wbCorp;
+
+  addLog('ok', 'DONE', `${productCount} produkter genereret (${productCount * 3} rækker) · ${skippedCount} sprunget over`);
+  setProgress(100);
+
+  // Update UI
+  document.getElementById('stat-rows').textContent = productCount;
+  document.getElementById('stat-detail').textContent = `produkter · ${productCount * 3} rækker i Shopify-filen`;
+
+  const pills = document.getElementById('stats-pills');
+  pills.innerHTML = `
+    <div class="stat-pill green">✓ ${state.stats.ok} ok</div>
+    ${state.stats.warn > 0 ? `<div class="stat-pill red">⚠ ${state.stats.warn} advarsler</div>` : ''}
+  `;
+
+  // Build friendly summary
+  const summaryEl = document.getElementById('summary-log');
+  const friendlyLines = [];
+  for (const l of state.logLines) {
+    let msg = '';
+    const m = l.msg;
+    if (l.type === 'ok' && l.tag === 'DONE') {
+      msg = `✅ ${m}`;
+    } else if (l.type === 'warn' && l.tag === 'PRIS') {
+      const name = m.split(':')[0];
+      msg = `⚠️ <b>${name}</b> — ingen pris fundet, sprunget over`;
+    } else if (l.type === 'warn' && l.tag === 'SEO') {
+      const name = m.split(':')[0];
+      msg = `📝 <b>${name}</b> — ingen tekst i tekstfil`;
+    } else if (l.type === 'error') {
+      msg = `❌ ${m}`;
+    } else {
+      continue; // skip all technical/info lines
+    }
+    friendlyLines.push(`<div style="padding:3px 0; border-bottom:1px solid var(--border);">${msg}</div>`);
+  }
+  summaryEl.innerHTML = friendlyLines.length
+    ? friendlyLines.join('')
+    : '<div style="color:var(--muted); font-style:italic;">Ingen advarsler — alt ser godt ud!</div>';
+
+  document.getElementById('output-section').style.display = 'block';
+  document.getElementById('gen-btn').disabled = false;
+  document.getElementById('step3').classList.add('done');
+  } catch(e) {
+    addLog('error', 'FATAL', `Uventet fejl: ${e.message} — ${e.stack ? e.stack.split('\n')[1] : ''}`);
+    document.getElementById('gen-btn').disabled = false;
+  }
+}
+
+// ============================================================
+// DOWNLOADS
+// ============================================================
+function downloadShopify() {
+  if (!state.outputWB) return;
+
+  const RED_HEADERS = new Set([
+    'Handle','Body (HTML)','Vendor','Product Category','Type','Published',
+    'Option1 Name','Option1 Value','Option1 Linked To',
+    'Option2 Name','Option2 Value','Option2 Linked To',
+    'Option3 Name','Option3 Value','Option3 Linked To',
+    'Variant Inventory Tracker','Variant Inventory Policy','Variant Fulfillment Service',
+    'Variant Requires Shipping','Variant Taxable',
+    'Unit Price Total Measure','Unit Price Total Measure Unit',
+    'Unit Price Base Measure','Unit Price Base Measure Unit',
+    'Image Position','Image Alt Text','Gift Card',
+    'Google Shopping / Google Product Category','Google Shopping / Gender',
+    'Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition',
+    'Google Shopping / Custom Product','Google Shopping / Custom Label 0',
+    'Google Shopping / Custom Label 1','Google Shopping / Custom Label 2',
+    'Google Shopping / Custom Label 3','Google Shopping / Custom Label 4',
+    'Name (product.metafields.custom.product_name)',
+    'Custom Badge (product.metafields.custom_badge.title)',
+    'Google: Custom Product (product.metafields.mm-google-shopping.custom_product)',
+    'Drikkevareproduktform (product.metafields.shopify.beverage-product-form)',
+    'Pakketype (product.metafields.shopify.package-type)',
+    'Supplerende produkter (product.metafields.shopify--discovery--product_recommendation.complementary_products)',
+    'Relaterede produkter (product.metafields.shopify--discovery--product_recommendation.related_products)',
+    'Relaterede produktindstillinger (product.metafields.shopify--discovery--product_recommendation.related_products_display)',
+    'Søg efter produktboosts (product.metafields.shopify--discovery--product_search_boost.queries)',
+    'Variant Weight Unit','Variant Tax Code','Cost per item','Status'
+  ]);
+
+  // Column widths from ZEUS template (in Excel units)
+  const COL_WIDTHS = {
+    'Handle':38.16,'Title':35.0,'Body (HTML)':5.83,'Vendor':9.5,'Product Category':23.33,
+    'Type':19.16,'Tags':52.5,'Published':25.66,'Option1 Name':28.5,'Option1 Value':15.16,
+    'Option1 Linked To':5.83,'Variant SKU':15.16,'Variant Grams':15.66,
+    'Variant Inventory Tracker':11.83,'Variant Inventory Policy':9.33,
+    'Variant Fulfillment Service':10.16,'Variant Price':22.16,'Variant Compare At Price':23.66,
+    'Variant Requires Shipping':5.83,'SEO Title':53.33,'SEO Description':80.66,
+    'Google Shopping / Google Product Category':5.83,
+    'Format (product.metafields.custom.format)':41.0,
+    'Ingredients (product.metafields.custom.ingredients)':80.66,
+    'Manufacturer (product.metafields.custom.manufacturer)':31.16,
+    'Nicotine strenth (mg/g) (product.metafields.custom.nicotine_strenth_mg_g_)':23.83,
+    'Pouches per can (product.metafields.custom.pouches_per_can)':17.33,
+    'Name (product.metafields.custom.product_name)':27.66,
+    'Strength (product.metafields.custom.strength)':15.0,
+    'Taste profile (product.metafields.custom.taste_profile)':12.66,
+    'UFI code (product.metafields.custom.ufi_code)':24.16,
+    'Weight per pouch (product.metafields.custom.weight_per_pouch)':18.33,
+    'Custom Badge (product.metafields.custom_badge.title)':5.83,
+    'Variant Image':106.0,'Variant Weight Unit':5.83,'Status':6.16
+  };
+
+  const ws = state.outputWB.Sheets['Shopify Import'];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+
+  // Find red column indices
+  const redColNums = new Set();
+  const colWidthMap = {};
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const addr = XLSX.utils.encode_cell({r: 0, c});
+    const cell = ws[addr];
+    if (!cell) continue;
+    if (RED_HEADERS.has(cell.v)) redColNums.add(c);
+    if (COL_WIDTHS[cell.v]) colWidthMap[c] = COL_WIDTHS[cell.v];
+  }
+
+  // Apply red fill + styles to all cells in red columns
+  const redFill = { patternType: 'solid', fgColor: { rgb: 'FFFFC7CE' } }; // Excel red highlight
+  const normalFill = { patternType: 'solid', fgColor: { rgb: 'FFFFFFFF' } };
+  const orangeFill = { patternType: 'solid', fgColor: { rgb: 'FFFFEB9C' } }; // Orange/yellow highlight
+
+  // Find column indices for manually-filled columns: Image Src (AF) and Variant Image (BP)
+  const manualCrewCols = new Set();
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = ws[XLSX.utils.encode_cell({r: 0, c})];
+    if (cell && (cell.v === 'Image Src' || cell.v === 'Variant Image')) manualCrewCols.add(c);
+  }
+
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({r, c});
+      const isManual = manualCrewCols.has(c);
+      const isRed = redColNums.has(c);
+      if (!ws[addr]) {
+        if (isRed) ws[addr] = {t:'z', s:{fill:redFill}};
+        continue;
+      }
+      if (isManual && r === 0) {
+        ws[addr].s = {
+          fill: orangeFill,
+          font: { bold: true, color: { rgb: 'FF000000' } },
+          alignment: { horizontal: 'center' }
+        };
+      } else {
+        ws[addr].s = { fill: isRed ? redFill : normalFill };
+      }
+    }
+  }
+
+  // Set column widths
+  ws['!cols'] = [];
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    ws['!cols'][c] = colWidthMap[c] ? { wch: colWidthMap[c] } : { wch: 12 };
+  }
+
+  // Freeze top row
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  // Add table formatting
+  const lastCol = XLSX.utils.encode_col(range.e.c);
+  const lastRow = range.e.r + 1;
+  if (!ws['!tables']) ws['!tables'] = [];
+  ws['!tables'].push({
+    name: 'ShopifyImport',
+    ref: `A1:${lastCol}${lastRow}`,
+    headerRow: true,
+    totalsRow: false,
+    styleInfo: { themeIndex: 2, showFirstColumn: false, showLastColumn: false, showRowStripes: true }
+  });
+
+  XLSX.writeFile(state.outputWB, 'snuscrew_shopify_import.xlsx', { cellStyles: true, bookSST: false });
+  addLog('ok', 'DL', 'SnusCrew XLSX downloadet');
+}
+
+function downloadShopifyCSV() {
+  if (!state.outputWB) return;
+  const ws = state.outputWB.Sheets['Shopify Import'];
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  const csv = data.map(row =>
+    row.map(cell => {
+      const s = String(cell === null || cell === undefined ? '' : cell);
+      return s.includes(';') || s.includes('"') || s.includes('\n')
+        ? '"' + s.replace(/"/g, '""') + '"'
+        : s;
+    }).join(';')
+  ).join('\n');
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'snuscrew_shopify_import.csv';
+  a.click();
+  addLog('ok', 'DL', 'SnusCrew CSV downloadet');
+}
+
+function downloadCorpCSV() {
+  if (!state.outputWBCorp) return;
+  const ws = state.outputWBCorp.Sheets['Shopify Import'];
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  const csv = data.map(row =>
+    row.map(cell => {
+      const s = String(cell === null || cell === undefined ? '' : cell);
+      return s.includes(';') || s.includes('"') || s.includes('\n')
+        ? '"' + s.replace(/"/g, '""') + '"'
+        : s;
+    }).join(';')
+  ).join('\n');
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'snuscorp_shopify_import.csv';
+  a.click();
+  addLog('ok', 'DL', 'SnusCorp CSV downloadet');
+}
+
+function downloadCorp(standalone = true) {
+  if (!state.outputWBCorp) return;
+
+  const CORP_RED_HEADERS = new Set([
+    'Handle','Body (HTML)','Vendor','Product Category','Type','Published',
+    'Option1 Name','Option1 Value','Option1 Linked To',
+    'Option2 Name','Option2 Value','Option2 Linked To',
+    'Option3 Name','Option3 Value','Option3 Linked To',
+    'Variant Inventory Tracker','Variant Inventory Qty','Variant Inventory Policy','Variant Fulfillment Service',
+    'Variant Requires Shipping','Variant Taxable',
+    'Unit Price Total Measure','Unit Price Total Measure Unit',
+    'Unit Price Base Measure','Unit Price Base Measure Unit',
+    'Image Position','Image Alt Text','Gift Card',
+    'Google Shopping / Google Product Category','Google Shopping / Gender',
+    'Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition',
+    'Google Shopping / Custom Product','Google Shopping / Custom Label 0',
+    'Google Shopping / Custom Label 1','Google Shopping / Custom Label 2',
+    'Google Shopping / Custom Label 3','Google Shopping / Custom Label 4',
+    'Google: Custom Product (product.metafields.mm-google-shopping.custom_product)',
+    'E-cigaret/damp-format (product.metafields.shopify.e-cigarette-vaporizer-style)',
+    'Supplerende produkter (product.metafields.shopify--discovery--product_recommendation.complementary_products)',
+    'Relaterede produkter (product.metafields.shopify--discovery--product_recommendation.related_products)',
+    'Relaterede produktindstillinger (product.metafields.shopify--discovery--product_recommendation.related_products_display)',
+    'Søg efter produktboosts (product.metafields.shopify--discovery--product_search_boost.queries)',
+    'Variant Weight Unit','Variant Tax Code','Cost per item','Status'
+  ]);
+
+  const CORP_WIDTHS = {
+    'Handle':38.16,'Title':35.0,'Body (HTML)':5.83,'Vendor':9.5,'Product Category':23.33,
+    'Type':19.16,'Tags':52.5,'Published':25.66,'Option1 Name':28.5,'Option1 Value':15.16,
+    'Variant SKU':15.16,'Variant Grams':15.66,
+    'Variant Inventory Tracker':11.83,'Variant Inventory Policy':9.33,
+    'Variant Fulfillment Service':10.16,'Variant Price':22.16,'Variant Compare At Price':23.66,
+    'SEO Title':53.33,'SEO Description':80.66,
+    'Format (product.metafields.custom.format)':41.0,
+    'Producent (product.metafields.custom.producent)':31.16,
+    'Nikotinstyrke (mg/g) (product.metafields.custom.nikotinstyrke)':23.83,
+    'Pouches per dåse (product.metafields.custom.pouches_per_daase)':17.33,
+    'Styrke (product.metafields.custom.styrke)':15.0,
+    'Smag (product.metafields.custom.smag)':12.66,
+    'Vægt per pouch (g) (product.metafields.custom.vaegt_per_pouch)':18.33,
+    'Variant Image':106.0,'Variant Weight Unit':5.83,'Status':6.16
+  };
+
+  const ws = state.outputWBCorp.Sheets['Shopify Import'];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+
+  const redColNums = new Set();
+  const colWidthMap = {};
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const addr = XLSX.utils.encode_cell({r: 0, c});
+    const cell = ws[addr];
+    if (!cell) continue;
+    if (CORP_RED_HEADERS.has(cell.v)) redColNums.add(c);
+    if (CORP_WIDTHS[cell.v]) colWidthMap[c] = CORP_WIDTHS[cell.v];
+  }
+
+  const redFill = { patternType: 'solid', fgColor: { rgb: 'FFFFC7CE' } };
+  const normalFill = { patternType: 'solid', fgColor: { rgb: 'FFFFFFFF' } };
+  const orangeFill2 = { patternType: 'solid', fgColor: { rgb: 'FFFFEB9C' } };
+
+  // Find column indices for manually-filled columns: Image Src (AG) and Variant Image (BT)
+  const manualCorpCols = new Set();
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = ws[XLSX.utils.encode_cell({r: 0, c})];
+    if (cell && (cell.v === 'Image Src' || cell.v === 'Variant Image')) manualCorpCols.add(c);
+  }
+
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({r, c});
+      const isManual = manualCorpCols.has(c);
+      const isRed = redColNums.has(c);
+      if (!ws[addr]) {
+        if (isRed) ws[addr] = {t:'z', s:{fill:redFill}};
+        continue;
+      }
+      if (isManual && r === 0) {
+        ws[addr].s = {
+          fill: orangeFill2,
+          font: { bold: true, color: { rgb: 'FF000000' } },
+          alignment: { horizontal: 'center' }
+        };
+      } else {
+        ws[addr].s = { fill: isRed ? redFill : normalFill };
+      }
+    }
+  }
+
+  ws['!cols'] = [];
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    ws['!cols'][c] = colWidthMap[c] ? { wch: colWidthMap[c] } : { wch: 12 };
+  }
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  const lastCol = XLSX.utils.encode_col(range.e.c);
+  const lastRow = range.e.r + 1;
+  if (!ws['!tables']) ws['!tables'] = [];
+  ws['!tables'].push({
+    name: 'ShopifyImport',
+    ref: `A1:${lastCol}${lastRow}`,
+    headerRow: true,
+    totalsRow: false,
+    styleInfo: { themeIndex: 2, showFirstColumn: false, showLastColumn: false, showRowStripes: true }
+  });
+
+  XLSX.writeFile(state.outputWBCorp, 'snuscorp_shopify_import.xlsx', { cellStyles: true, bookSST: false });
+  if (standalone) addLog('ok', 'DL', 'SnusCorp XLSX downloadet');
+}
+
+
+function downloadAll() {
+  let delay = 0;
+  const crewFmt = state.fmtCrew;
+  const corpFmt = state.fmtCorp;
+  if (crewFmt === 'xlsx' || crewFmt === 'both') { setTimeout(downloadShopify, delay); delay += 500; }
+  if (crewFmt === 'csv'  || crewFmt === 'both') { setTimeout(downloadShopifyCSV, delay); delay += 500; }
+  if (corpFmt === 'xlsx' || corpFmt === 'both') { setTimeout(downloadCorp, delay); delay += 500; }
+  if (corpFmt === 'csv'  || corpFmt === 'both') { setTimeout(downloadCorpCSV, delay); }
+}
+
+function downloadLog() {
+  const lines = state.logLines.map(l =>
+    `[${l.time}] [${l.tag.padEnd(6)}] [${l.type.toUpperCase()}] ${l.msg}`
+  ).join('\n');
+  const blob = new Blob([lines], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'snuscrew_import_log.txt';
+  a.click();
+  addLog('ok', 'DL', 'Logfil downloadet');
+}
+
+// ============================================================
+// ONEDRIVE / SHAREPOINT INTEGRATION (MSAL)
+// ============================================================
+const OD_CONFIG = {
+  clientId: '192795b0-60aa-4eee-af44-0959edc64808',
+  tenantId: 'e05bc5b3-bbac-4260-9e49-548d5950bd1e',
+  // SharePoint site: nordicbrandbase.sharepoint.com/sites/Digital
+  files: {
+    meta:  { id: 'CEABBDA8-F4D9-40A9-AA27-8644C16E9385', label: 'BC_SnusCrew Meta data overførsel SKU.xlsx' },
+    price: { id: 'FFB604EC-6F43-4080-9FC2-CCD1431F0C0E', label: 'SnusCrew_Prices & Fixed costs.xlsx' },
+    text:  { id: 'e78d8ac3-7a89-46e2-a9ff-3a1d7a98e16f', label: 'Tekster_samlet.xlsx' }
+  },
+  siteHostname: 'nordicbrandbase.sharepoint.com',
+  sitePath: '/sites/Digital'
+};
+
+const msalConfig = {
+  auth: {
+    clientId: OD_CONFIG.clientId,
+    authority: `https://login.microsoftonline.com/${OD_CONFIG.tenantId}`,
+    redirectUri: window.location.href.split('?')[0].split('#')[0]
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+
+let msalInstance = null;
+let odAccount = null;
+
+function odInit() {
+  try {
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    msalInstance.initialize().then(() => {
+      // Handle redirect response
+      msalInstance.handleRedirectPromise().then(resp => {
+        if (resp && resp.account) {
+          odAccount = resp.account;
+          odSetConnected(odAccount.name || odAccount.username);
+        } else {
+          const accounts = msalInstance.getAllAccounts();
+          if (accounts.length > 0) {
+            odAccount = accounts[0];
+            odSetConnected(odAccount.name || odAccount.username);
+          }
+        }
+      }).catch(e => {
+        console.warn('MSAL redirect error:', e);
+      });
+    });
+  } catch(e) {
+    console.warn('MSAL init error:', e);
+  }
+}
+
+async function odLogin() {
+  if (!msalInstance) return;
+  try {
+    const resp = await msalInstance.loginPopup({
+      scopes: ['User.Read', 'Files.Read.All', 'Sites.Read.All']
+    });
+    odAccount = resp.account;
+    odSetConnected(odAccount.name || odAccount.username);
+  } catch(e) {
+    odSetError('Login fejlede: ' + (e.message || e));
+  }
+}
+
+function odLogout() {
+  if (!msalInstance) return;
+  msalInstance.logoutPopup({ account: odAccount });
+  odAccount = null;
+  odSetDisconnected();
+}
+
+function odSetConnected(name) {
+  document.getElementById('od-badge').textContent = '✓ ' + name;
+  document.getElementById('od-badge').className = 'od-badge connected';
+  document.getElementById('od-login-btn').style.display = 'none';
+  document.getElementById('od-fetch-btn').disabled = false;
+  document.getElementById('od-logout-btn').style.display = 'flex';
+  document.getElementById('od-file-status').style.display = 'flex';
+  addLog('ok', 'OD', 'Logget ind som ' + name);
+}
+
+function odSetDisconnected() {
+  document.getElementById('od-badge').textContent = 'IKKE LOGGET IND';
+  document.getElementById('od-badge').className = 'od-badge';
+  document.getElementById('od-login-btn').style.display = 'flex';
+  document.getElementById('od-fetch-btn').disabled = true;
+  document.getElementById('od-logout-btn').style.display = 'none';
+  document.getElementById('od-file-status').style.display = 'none';
+}
+
+function odSetError(msg) {
+  document.getElementById('od-badge').textContent = '⚠ Fejl';
+  document.getElementById('od-badge').className = 'od-badge error';
+  addLog('error', 'OD', msg);
+}
+
+async function odGetToken() {
+  const scopes = ['Files.Read.All', 'Sites.Read.All'];
+  try {
+    const resp = await msalInstance.acquireTokenSilent({ scopes, account: odAccount });
+    return resp.accessToken;
+  } catch(e) {
+    const resp = await msalInstance.acquireTokenPopup({ scopes, account: odAccount });
+    return resp.accessToken;
+  }
+}
+
+async function odFetchFile(token, fileId, labelEl, tagEl) {
+  labelEl.className = 'od-file-name';
+  tagEl.className = 'od-file-tag loading';
+  tagEl.textContent = 'HENTER...';
+  try {
+    // Get site id first
+    const siteResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${OD_CONFIG.siteHostname}:${OD_CONFIG.sitePath}`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    if (!siteResp.ok) throw new Error('Kunne ikke finde SharePoint-site');
+    const siteData = await siteResp.json();
+    const siteId = siteData.id;
+
+    // Get file download URL via driveItem by id
+    const itemResp = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/items/${fileId}`,
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    if (!itemResp.ok) throw new Error('Fil ikke fundet (id: ' + fileId + ')');
+    const itemData = await itemResp.json();
+    const downloadUrl = itemData['@microsoft.graph.downloadUrl'];
+    labelEl.textContent = itemData.name;
+
+    // Download the file
+    const fileResp = await fetch(downloadUrl);
+    if (!fileResp.ok) throw new Error('Download fejlede');
+    const arrayBuffer = await fileResp.arrayBuffer();
+
+    tagEl.className = 'od-file-tag ok';
+    tagEl.textContent = '✓ HENTET';
+    labelEl.className = 'od-file-name loaded';
+    return arrayBuffer;
+  } catch(e) {
+    tagEl.className = 'od-file-tag';
+    tagEl.textContent = '⚠ FEJL';
+    labelEl.className = 'od-file-name';
+    addLog('error', 'OD', (labelEl.dataset.type || 'fil') + ': ' + (e.message || e));
+    return null;
+  }
+}
+
+async function odFetchAll() {
+  if (!odAccount || !msalInstance) return;
+  document.getElementById('od-fetch-btn').disabled = true;
+  document.getElementById('od-file-status').style.display = 'flex';
+  addLog('info', 'OD', 'Henter filer fra SharePoint...');
+
+  let token;
+  try {
+    token = await odGetToken();
+  } catch(e) {
+    odSetError('Token fejl: ' + (e.message || e));
+    document.getElementById('od-fetch-btn').disabled = false;
+    return;
+  }
+
+  // Fetch meta
+  const metaBuffer = await odFetchFile(
+    token,
+    OD_CONFIG.files.meta.id,
+    document.getElementById('od-meta-name'),
+    document.getElementById('od-meta-tag')
+  );
+  if (metaBuffer) {
+    // Simulate file load for meta
+    const wb = XLSX.read(metaBuffer, { type: 'array', cellFormula: false, cellNF: false, raw: false });
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'metadata') || wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    state.metaHeaders = rows[0];
+    state.metaData = rows.slice(1).filter(r => r.some(v => v !== null));
+    document.getElementById('meta-name').textContent = OD_CONFIG.files.meta.label + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
+    document.getElementById('zone-meta').classList.add('has-file');
+    document.getElementById('meta-badge').className = 'upload-badge';
+    document.getElementById('meta-badge').textContent = '✓ INDLÆST';
+    addLog('ok', 'META', `${OD_CONFIG.files.meta.label} — ${state.metaData.length} produkter`);
+    buildBrandList();
+  }
+
+  // Fetch price
+  const priceBuffer = await odFetchFile(
+    token,
+    OD_CONFIG.files.price.id,
+    document.getElementById('od-price-name'),
+    document.getElementById('od-price-tag')
+  );
+  if (priceBuffer) {
+    const wb = XLSX.read(priceBuffer, { type: 'array', cellFormula: false, cellNF: false, raw: false });
+    state.priceWB = wb;
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    state.priceData = rows;
+    document.getElementById('price-name').textContent = OD_CONFIG.files.price.label;
+    const sel = document.getElementById('price-sheet-select');
+    sel.innerHTML = wb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+    sel.value = wb.SheetNames[0];
+    document.getElementById('price-sheet-selector').style.display = 'flex';
+    document.getElementById('zone-price').classList.add('has-file');
+    document.getElementById('price-badge').className = 'upload-badge';
+    document.getElementById('price-badge').textContent = '✓ INDLÆST';
+    addLog('ok', 'PRIS', OD_CONFIG.files.price.label + ' indlæst');
+  }
+
+  // Fetch text
+  const textBuffer = await odFetchFile(
+    token,
+    OD_CONFIG.files.text.id,
+    document.getElementById('od-text-name'),
+    document.getElementById('od-text-tag')
+  );
+  if (textBuffer) {
+    const wb = XLSX.read(textBuffer, { type: 'array' });
+    function parseTextSheet(ws) {
+      if (!ws) return {};
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      const map = {};
+      for (const row of rows.slice(1)) {
+        const brand = row[0]; const produkt = row[1];
+        if (!produkt) continue;
+        const entry = {
+          seoHeadline: row[2] ? String(row[2]).trim().replace(/ -- /g, ' - ') : null,
+          seoTitle:    row[3] ? String(row[3]).trim().replace(/ -- /g, ' - ') : null,
+          metaDesc:    row[4] ? String(row[4]).trim() : null,
+          shortDesc:   row[5] ? String(row[5]).trim() : null,
+          longDesc:    row[6] ? String(row[6]).trim() : null
+        };
+        if (brand) map[String(brand).trim().toLowerCase() + '|' + String(produkt).trim().toLowerCase()] = entry;
+        map['|' + String(produkt).trim().toLowerCase()] = entry;
+      }
+      return map;
+    }
+    const crewSheet = wb.SheetNames.find(n => n.toLowerCase().includes('snuscrew'));
+    const corpSheet = wb.SheetNames.find(n => n.toLowerCase().includes('snuscorp'));
+    if (crewSheet || corpSheet) {
+      state.textData = crewSheet ? parseTextSheet(wb.Sheets[crewSheet]) : {};
+      state.textDataCorp = corpSheet ? parseTextSheet(wb.Sheets[corpSheet]) : {};
+      addLog('ok', 'TEKST', `SnusCrew: ${Object.keys(state.textData).length} · SnusCorp: ${Object.keys(state.textDataCorp).length} produkter`);
+    } else {
+      const ws2 = wb.Sheets[wb.SheetNames[0]];
+      state.textData = parseTextSheet(ws2);
+      state.textDataCorp = state.textData;
+      addLog('ok', 'TEKST', `${Object.keys(state.textData).length} produkter med SEO-tekster`);
+    }
+    state.textContent = 'xlsx';
+    document.getElementById('text-name').textContent = OD_CONFIG.files.text.label + ' ✓';
+    document.getElementById('zone-text').classList.add('has-file');
+    document.getElementById('text-badge').className = 'upload-badge';
+    document.getElementById('text-badge').textContent = '✓ INDLÆST';
+  }
+
+  document.getElementById('od-fetch-btn').disabled = false;
+  checkReady();
+  if (metaBuffer && priceBuffer) addLog('ok', 'OD', 'Alle filer hentet fra SharePoint ✓');
+}
+
+// Init MSAL on page load
+odInit();
+</script>
+</body>
+</html>
