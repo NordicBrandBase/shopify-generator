@@ -1726,10 +1726,6 @@ async function generate() {
   setProgress(5);
   addLog('info', 'START', 'Generering påbegyndt...');
 
-  // Fetch Shopify images (opens login popups for both shops)
-  await shopifyFetchAllImages();
-  setProgress(10);
-
   // Build price map
   if (state.priceData && state.priceData.length > 4) {
     const r = state.priceData[4];
@@ -1767,12 +1763,11 @@ async function generate() {
       const seo = findSeoData(seoMap, name, brandKey);
       if (!seo.seoTitle && !seo.shortDesc && !seo.longDesc) missingTexts.add(name);
     }
-    // Check images
-    if (state.shopifyImageMapCrew) {
-      const handle = makeHandle(name);
-      const imgs = findShopifyImages(handle, state.shopifyImageMapCrew);
-      if (imgs.length === 0) missingImages.add(name);
-    }
+    // Check images via CDN
+    const handle = makeHandle(name);
+    const testUrl = `${SHOPIFY_CDN.crew}${handle}-1.png`;
+    const hasImg = await imageExists(testUrl);
+    if (!hasImg) missingImages.add(name);
   }
 
   if (missingPrices.size > 0 || missingTexts.size > 0 || missingImages.size > 0) {
@@ -2010,7 +2005,7 @@ async function generate() {
     r3[C['Variant Weight Unit']] = 'g';
 
     // --- Shopify images ---
-    const images = findShopifyImages(handle, state.shopifyImageMapCrew);
+    const images = await findShopifyImages(handle, SHOPIFY_CDN.crew);
     const img1 = images[0] || null;
     const img2 = images[1] || null;
     const img3 = images[2] || null;
@@ -2058,7 +2053,7 @@ async function generate() {
       // Add images to SnusCorp rows
       const CC = {};
       SNUSCORP_HEADERS.forEach((h, i) => { CC[h] = i; });
-      const corpImages = findShopifyImages(handle, state.shopifyImageMapCorp);
+      const corpImages = await findShopifyImages(handle, SHOPIFY_CDN.corp);
       const cImg1 = corpImages[0] || null;
       const cImg2 = corpImages[1] || null;
       const cImg3 = corpImages[2] || null;
@@ -2730,128 +2725,41 @@ async function odFetchAll() {
 }
 
 // ============================================================
-// SHOPIFY OAUTH + API INTEGRATION
+// SHOPIFY CDN BILLEDINTEGRATION
 // ============================================================
-const SHOPIFY_CONFIG = {
-  clientId: '447c2cc5be07b401f8a965226fb835be',
-  scopes: 'read_products,write_products,read_files',
-  netlifyFn: 'https://shopify-generator-functions.netlify.app/.netlify/functions/shopify-token',
-  redirectUri: 'https://nordicbrandbase.github.io/shopify-generator/Shopify_Generator_OneDrive.html',
-  shops: {
-    crew: 'btem8k-va.myshopify.com',
-    corp: 'snuscorp.myshopify.com'
-  }
+const SHOPIFY_CDN = {
+  crew: 'https://cdn.shopify.com/s/files/1/0930/0620/1157/files/',
+  corp: 'https://cdn.shopify.com/s/files/1/0800/0205/6502/files/'
 };
 
-const shopifyTokens = { crew: null, corp: null };
-
-// OAuth via popup — returns access token or null
-function shopifyLoginPopup(shopDomain) {
-  return new Promise((resolve) => {
-    const stateKey = 'shopify_' + shopDomain.replace(/\./g, '');
-    const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${SHOPIFY_CONFIG.clientId}&scope=${SHOPIFY_CONFIG.scopes}&redirect_uri=${encodeURIComponent(SHOPIFY_CONFIG.redirectUri)}&state=${stateKey}`;
-    const popup = window.open(authUrl, 'shopify_auth_' + stateKey, 'width=600,height=700,scrollbars=yes');
-    const handler = (event) => {
-      if (event.data && event.data.type === 'shopify_token' && event.data.shop === shopDomain) {
-        window.removeEventListener('message', handler);
-        resolve(event.data.token);
-      }
-    };
-    window.addEventListener('message', handler);
-    setTimeout(() => { window.removeEventListener('message', handler); resolve(null); }, 120000);
-  });
-}
-
-// Fetch all image files from a shop
-async function fetchShopifyFiles(token, shopDomain) {
-  const map = {};
-  if (!token) return map;
+// Check if an image exists on Shopify CDN by trying to fetch it
+async function imageExists(url) {
   try {
-    const resp = await fetch(
-      `https://${shopDomain}/admin/api/2026-01/files.json?content_type=IMAGE&limit=250`,
-      { headers: { 'X-Shopify-Access-Token': token } }
-    );
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    for (const file of (data.files || [])) {
-      if (file.url) {
-        const filename = file.url.split('/').pop().split('?')[0].toLowerCase();
-        map[filename] = file.url.split('?')[0];
-      }
-    }
+    const resp = await fetch(url, { method: 'HEAD' });
+    return resp.ok;
   } catch(e) {
-    addLog('warn', 'SHOPIFY', `Billedhentning fejlede (${shopDomain}): ${e.message}`);
+    return false;
   }
-  return map;
 }
 
-// Called during generate — logs in to both shops and fetches images
-async function shopifyFetchAllImages() {
-  addLog('info', 'SHOPIFY', 'Logger ind på SnusCrew (popup åbner)...');
-  if (!shopifyTokens.crew) {
-    shopifyTokens.crew = await shopifyLoginPopup(SHOPIFY_CONFIG.shops.crew);
-  }
-  addLog('info', 'SHOPIFY', 'Logger ind på SnusCorp (popup åbner)...');
-  if (!shopifyTokens.corp) {
-    shopifyTokens.corp = await shopifyLoginPopup(SHOPIFY_CONFIG.shops.corp);
-  }
-  addLog('info', 'SHOPIFY', 'Henter billedfiler...');
-  const [crewMap, corpMap] = await Promise.all([
-    fetchShopifyFiles(shopifyTokens.crew, SHOPIFY_CONFIG.shops.crew),
-    fetchShopifyFiles(shopifyTokens.corp, SHOPIFY_CONFIG.shops.corp)
-  ]);
-  state.shopifyImageMapCrew = crewMap;
-  state.shopifyImageMapCorp = corpMap;
-  addLog('ok', 'SHOPIFY', `Billeder klar — SnusCrew: ${Object.keys(crewMap).length} · SnusCorp: ${Object.keys(corpMap).length} ✓`);
-}
-
-// Find up to 3 images for a handle in a given image map
-function findShopifyImages(handle, imageMap) {
-  if (!imageMap) return [];
+// Find up to 3 images for a handle on a given CDN
+async function findShopifyImages(handle, cdnBase) {
   const images = [];
+  const extensions = ['png', 'jpg', 'jpeg', 'webp'];
   for (let i = 1; i <= 3; i++) {
     let found = null;
-    for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
-      const key = `${handle}-${i}.${ext}`;
-      if (imageMap[key]) { found = imageMap[key]; break; }
+    for (const ext of extensions) {
+      const url = `${cdnBase}${handle}-${i}.${ext}`;
+      if (await imageExists(url)) { found = url; break; }
     }
     if (found) images.push(found);
-    else break;
+    else break; // Stop at first missing
   }
   return images;
 }
 
-// Handle OAuth callback when redirected back from Shopify (runs in popup)
-function shopifyHandleCallback() {
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const shop = params.get('shop');
-  const stateParam = params.get('state');
-  if (code && shop && stateParam && stateParam.startsWith('shopify_')) {
-    fetch(SHOPIFY_CONFIG.netlifyFn, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shop, code })
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.access_token && window.opener) {
-        window.opener.postMessage({ type: 'shopify_token', shop, token: data.access_token }, '*');
-        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>✅ Forbundet!</h2><p>Dette vindue lukker automatisk...</p></div>';
-        setTimeout(() => window.close(), 1500);
-      }
-    })
-    .catch(() => { if (window.opener) window.close(); });
-    return true;
-  }
-  return false;
-}
-
-// Init
-const _isCallback = shopifyHandleCallback();
-if (!_isCallback) {
-  odInit();
-}
+// Init MSAL
+odInit();
 </script>
 </body>
 </html>
