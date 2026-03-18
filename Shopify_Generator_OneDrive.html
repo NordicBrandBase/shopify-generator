@@ -2792,15 +2792,38 @@ function shopifyCrewLogin() {
     const scopes = 'read_products,write_products,read_files';
     const redirectUri = encodeURIComponent(SHOPIFY_CONFIG2.redirectUri);
     const authUrl = `https://${SHOPIFY_CONFIG2.crewShop}/admin/oauth/authorize?client_id=${SHOPIFY_CONFIG2.clientId}&scope=${scopes}&redirect_uri=${redirectUri}&state=crew_finalize`;
+    
+    // Clear any old token
+    sessionStorage.removeItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
+    
     window.open(authUrl, 'shopify_crew_login', 'width=600,height=700,scrollbars=yes');
+    
+    // Listen for postMessage
     const handler = (event) => {
       if (event.data && event.data.type === 'shopify_token' && event.data.shop === SHOPIFY_CONFIG2.crewShop) {
         window.removeEventListener('message', handler);
+        clearInterval(pollInterval);
         resolve(event.data.token);
       }
     };
     window.addEventListener('message', handler);
-    setTimeout(() => { window.removeEventListener('message', handler); resolve(null); }, 120000);
+    
+    // Also poll sessionStorage every second as fallback
+    const pollInterval = setInterval(() => {
+      const token = sessionStorage.getItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
+      if (token) {
+        clearInterval(pollInterval);
+        window.removeEventListener('message', handler);
+        sessionStorage.removeItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
+        resolve(token);
+      }
+    }, 1000);
+    
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      window.removeEventListener('message', handler);
+      resolve(null);
+    }, 120000);
   });
 }
 
@@ -2950,8 +2973,13 @@ function shopifyHandleCallback() {
     })
     .then(r => r.json())
     .then(data => {
-      if (data.access_token && window.opener) {
-        window.opener.postMessage({ type: 'shopify_token', shop, token: data.access_token }, '*');
+      if (data.access_token) {
+        // Store token in sessionStorage so main window can pick it up
+        sessionStorage.setItem('shopify_token_' + shop, data.access_token);
+        // Also try postMessage if opener exists
+        if (window.opener) {
+          window.opener.postMessage({ type: 'shopify_token', shop, token: data.access_token }, '*');
+        }
         document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>✅ Forbundet!</h2><p>Dette vindue lukker automatisk...</p></div>';
         setTimeout(() => window.close(), 1500);
       } else {
