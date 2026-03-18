@@ -2078,7 +2078,7 @@ async function generate() {
     outputRows.push(r1, r2, r3);
 
     // Store Product Info for later Shopify write
-    if (!state.productInfoData) state.productInfoData = [];
+    state.productInfoData = []; // Reset ved hver generering
     state.productInfoData.push({
       handle,
       productInfo: r1[C['Product Info (product.metafields.custom.product_info)']] || null
