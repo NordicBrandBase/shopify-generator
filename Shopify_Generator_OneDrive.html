@@ -1099,9 +1099,11 @@ async function unzipDocx(arrayBuffer) {
 // ============================================================
 function buildBrandList() {
   const brands = new Set();
-  if (state.metaData) {
+  if (state.metaData && state.metaHeaders) {
+    const brandCol = state.metaHeaders.findIndex(v => v && String(v).toLowerCase().includes('attributter brand'));
+    const col = brandCol >= 0 ? brandCol : 102;
     for (const row of state.metaData) {
-      const b = row[102];
+      const b = row[col];
       if (b && String(b).trim()) brands.add(String(b).trim());
     }
   }
@@ -1143,8 +1145,10 @@ function selectBrand(brand) {
   skuGrid.innerHTML = '';
   state.brandProducts = [];
 
+  const brandColIdx = state.metaHeaders ? state.metaHeaders.findIndex(v => v && String(v).toLowerCase().includes('attributter brand')) : 102;
+  const brandCol = brandColIdx >= 0 ? brandColIdx : 102;
   for (const row of state.metaData) {
-    const rowBrand = row[102];
+    const rowBrand = row[brandCol];
     if (!rowBrand || String(rowBrand).trim() !== brand) continue;
     const sku = row[1];
     const name = row[2];
@@ -1783,7 +1787,7 @@ async function generate() {
   const missingTexts = new Set();
   const missingImages = new Set();
   for (const row of state.metaData) {
-    const sku = row[1], name = row[2], brand = row[102];
+    const sku = row[1], name = row[2], brand = row[CI.BRAND];
     if (!sku || !name || !brand) continue;
     const brandKey = String(brand).trim();
     const isSelected = [...state.selectedBrands].some(b =>
@@ -1855,16 +1859,30 @@ async function generate() {
     if (!proceed) { document.getElementById('gen-btn').disabled = false; return; }
   }
 
-  // Metadata column indices (0-based)
-  // B=1(SKU), C=2(Name), H=7(GTIN), Y=24(NetWeight), CY=102(Brand), CZ=103(mg/g),
-  // DA=104(Format), DB=105(mg/pouch), DC=106(Pouches/can), DD=107(PouchWeight),
-  // DE=108(Strength), DF=109(Taste), DG=110(Manufacturer), DH=111(Ingredients), DI=112(UFI)
+  // Metadata column indices — resolved dynamically from header row
+  const h = state.metaHeaders || [];
+  function findCol(keywords) {
+    const idx = h.findIndex(v => v && keywords.some(kw => String(v).toLowerCase().includes(kw.toLowerCase())));
+    return idx >= 0 ? idx : null;
+  }
   const CI = {
-    SKU: 1, NAME: 2, GTIN: 7, NETWEIGHT: 25,
-    BRAND: 102, MGG: 103, FORMAT: 104, MGPOUCH: 105,
-    POUCHES: 106, POUCHW: 107, STRENGTH: 108, TASTE: 109,
-    MANUFACTURER: 110, INGREDIENTS: 111, UFI: 112
+    SKU:          findCol(['BC Vare', 'Vare\nNummer', 'SKU']) ?? 1,
+    NAME:         findCol(['Vare\nBeskrivelse', 'Beskrivelse', 'Name']) ?? 2,
+    GTIN:         findCol(['GTIN']) ?? 7,
+    NETWEIGHT:    findCol(['Nettovægt', 'Netweight']) ?? 24,
+    BRAND:        findCol(['Attributter Brand']) ?? 102,
+    MGG:          findCol(['MG/G', 'mg/g', 'mg per gram']) ?? 103,
+    FORMAT:       findCol(['Attributter Format']) ?? 104,
+    MGPOUCH:      findCol(['MG per pouch', 'mg per pouch']) ?? 105,
+    POUCHES:      findCol(['Pouch per can']) ?? 106,
+    POUCHW:       findCol(['pouch weight']) ?? 107,
+    STRENGTH:     findCol(['Strength group']) ?? 108,
+    TASTE:        findCol(['Taste profil', 'flavour']) ?? 109,
+    MANUFACTURER: findCol(['Producent', 'Manufacturer']) ?? 110,
+    INGREDIENTS:  findCol(['Ingrediens']) ?? 111,
+    UFI:          findCol(['UFI']) ?? 112,
   };
+  addLog('info', 'META', `Kolonner: BRAND=${CI.BRAND} FORMAT=${CI.FORMAT} STRENGTH=${CI.STRENGTH} UFI=${CI.UFI}`);
 
   const outputRows = [ZEUS_HEADERS];
   const corpRows = [SNUSCORP_HEADERS];
