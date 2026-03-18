@@ -2805,37 +2805,6 @@ function shopifyCrewLogin() {
   });
 }
 
-// Handle OAuth callback in popup window
-function shopifyHandleCallback() {
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const shop = params.get('shop');
-  const stateParam = params.get('state');
-  if (code && shop && stateParam) {
-    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⏳ Logger ind...</h2><p>Vent venligst...</p></div>';
-    fetch(SHOPIFY_WRITE_CONFIG.netlifyToken, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shop, code })
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.access_token && window.opener) {
-        window.opener.postMessage({ type: 'shopify_token', shop, token: data.access_token }, '*');
-        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>✅ Forbundet!</h2><p>Dette vindue lukker automatisk...</p></div>';
-        setTimeout(() => window.close(), 1500);
-      } else {
-        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ Fejl</h2><p>' + JSON.stringify(data) + '</p></div>';
-      }
-    })
-    .catch(e => {
-      document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ Fejl</h2><p>' + e.message + '</p></div>';
-    });
-    return true;
-  }
-  return false;
-}
-
 async function writeProductInfo() {
   if (!state.productInfoData || state.productInfoData.length === 0) {
     document.getElementById('product-info-status').textContent = '⚠️ Ingen Product Info data — generér filer først.';
@@ -2907,7 +2876,38 @@ async function writeProductInfo() {
 }
 }
 
-// Init MSAL
+// Init
+function shopifyHandleCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const shop = params.get('shop');
+  const stateParam = params.get('state');
+  // Only handle Shopify callback if state starts with 'crew_' or 'shopify_'
+  if (code && shop && stateParam && (stateParam.startsWith('crew_') || stateParam.startsWith('shopify_'))) {
+    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⏳ Logger ind...</h2><p>Vent venligst...</p></div>';
+    fetch(SHOPIFY_WRITE_CONFIG.netlifyToken, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shop, code })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.access_token && window.opener) {
+        window.opener.postMessage({ type: 'shopify_token', shop, token: data.access_token }, '*');
+        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>✅ Forbundet!</h2><p>Dette vindue lukker automatisk...</p></div>';
+        setTimeout(() => window.close(), 1500);
+      } else {
+        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ Fejl</h2><p>' + JSON.stringify(data) + '</p></div>';
+      }
+    })
+    .catch(e => {
+      document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ Fejl</h2><p>' + e.message + '</p></div>';
+    });
+    return true;
+  }
+  return false;
+}
+
 const _isCallback = shopifyHandleCallback();
 if (!_isCallback) {
   odInit();
