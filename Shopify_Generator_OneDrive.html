@@ -897,11 +897,11 @@
       </div>
     </div>
 
-    <!-- Product Info sektion -->
+    <!-- Færdiggør produkter sektion -->
     <div style="margin-top:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px;">
-      <div style="font-family:'Syne',sans-serif; font-weight:700; font-size:13px; margin-bottom:8px;">🛍 Skriv Product Info til SnusCrew</div>
-      <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">Efter CSV-import i Shopify — klik her for at skrive product_info metafeltet direkte på alle genererede produkter.</div>
-      <button class="download-btn" id="product-info-btn" onclick="writeProductInfo()" style="background:rgba(14,166,114,0.1); border-color:var(--success-border); color:var(--green);">✏️ Skriv Product Info til SnusCrew</button>
+      <div style="font-family:'Syne',sans-serif; font-weight:700; font-size:13px; margin-bottom:8px;">🛍 Færdiggør produkter på SnusCrew</div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">Efter CSV-import i Shopify — logger ind og sætter Variant Image (med korrekt URL) samt skriver Product Info metafeltet på alle genererede produkter.</div>
+      <button class="download-btn" id="product-info-btn" onclick="finalizeProducts()" style="background:rgba(14,166,114,0.1); border-color:var(--success-border); color:var(--green);">✅ Færdiggør produkter</button>
       <div id="product-info-status" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>
     </div>
   </div>
@@ -2776,11 +2776,10 @@ async function findShopifyImages(handle, cdnBase) {
 }
 
 // ============================================================
-// SHOPIFY PRODUCT INFO WRITER
+// SHOPIFY FINALIZE — Variant Image + Product Info
 // ============================================================
-const SHOPIFY_WRITE_CONFIG = {
+const SHOPIFY_CONFIG2 = {
   clientId: '447c2cc5be07b401f8a965226fb835be',
-  netlifyAuth: 'https://shopify-generator-functions.netlify.app/.netlify/functions/shopify-auth',
   netlifyToken: 'https://shopify-generator-functions.netlify.app/.netlify/functions/shopify-token',
   redirectUri: 'https://nordicbrandbase.github.io/shopify-generator/Shopify_Generator_OneDrive.html',
   crewShop: 'btem8k-va.myshopify.com'
@@ -2788,14 +2787,14 @@ const SHOPIFY_WRITE_CONFIG = {
 
 let crewAccessToken = null;
 
-// Login to SnusCrew via OAuth popup
 function shopifyCrewLogin() {
   return new Promise((resolve) => {
-    const stateKey = 'crew_product_info';
-    const authUrl = `${SHOPIFY_WRITE_CONFIG.netlifyAuth}?shop=${SHOPIFY_WRITE_CONFIG.crewShop}&state=${stateKey}`;
-    const popup = window.open(authUrl, 'shopify_crew_login', 'width=600,height=700,scrollbars=yes');
+    const scopes = 'read_products,write_products,read_files';
+    const redirectUri = encodeURIComponent(SHOPIFY_CONFIG2.redirectUri);
+    const authUrl = `https://${SHOPIFY_CONFIG2.crewShop}/admin/oauth/authorize?client_id=${SHOPIFY_CONFIG2.clientId}&scope=${scopes}&redirect_uri=${redirectUri}&state=crew_finalize`;
+    window.open(authUrl, 'shopify_crew_login', 'width=600,height=700,scrollbars=yes');
     const handler = (event) => {
-      if (event.data && event.data.type === 'shopify_token' && event.data.shop === SHOPIFY_WRITE_CONFIG.crewShop) {
+      if (event.data && event.data.type === 'shopify_token' && event.data.shop === SHOPIFY_CONFIG2.crewShop) {
         window.removeEventListener('message', handler);
         resolve(event.data.token);
       }
@@ -2805,9 +2804,9 @@ function shopifyCrewLogin() {
   });
 }
 
-async function writeProductInfo() {
+async function finalizeProducts() {
   if (!state.productInfoData || state.productInfoData.length === 0) {
-    document.getElementById('product-info-status').textContent = '⚠️ Ingen Product Info data — generér filer først.';
+    document.getElementById('product-info-status').textContent = '⚠️ Ingen produkter — generér filer først.';
     return;
   }
 
@@ -2816,62 +2815,123 @@ async function writeProductInfo() {
   btn.disabled = true;
   statusEl.textContent = '⏳ Logger ind på SnusCrew...';
 
-  // Login if needed
   if (!crewAccessToken) {
     crewAccessToken = await shopifyCrewLogin();
   }
-
   if (!crewAccessToken) {
     statusEl.textContent = '⚠️ Login fejlede — prøv igen.';
     btn.disabled = false;
     return;
   }
 
-  statusEl.textContent = `⏳ Skriver Product Info til ${state.productInfoData.length} produkter...`;
+  // Fetch all files from SnusCrew to get ?v= URLs
+  statusEl.textContent = '⏳ Henter billedfiler fra SnusCrew...';
+  const fileMap = {};
+  try {
+    const resp = await fetch(
+      `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/files.json?content_type=IMAGE&limit=250`,
+      { headers: { 'X-Shopify-Access-Token': crewAccessToken } }
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      for (const file of (data.files || [])) {
+        if (file.url) {
+          const filename = file.url.split('/').pop().split('?')[0].toLowerCase();
+          fileMap[filename] = file.url; // Keep full URL with ?v=
+        }
+      }
+    }
+  } catch(e) {
+    addLog('warn', 'SHOPIFY', 'Kunne ikke hente filer: ' + e.message);
+  }
 
   let ok = 0, failed = 0;
+  statusEl.textContent = `⏳ Færdiggør ${state.productInfoData.length} produkter...`;
 
   for (const product of state.productInfoData) {
-    if (!product.handle || !product.productInfo) continue;
+    if (!product.handle) continue;
     try {
       // Find product by handle
       const searchResp = await fetch(
-        `https://${SHOPIFY_WRITE_CONFIG.crewShop}/admin/api/2026-01/products.json?handle=${product.handle}&fields=id`,
+        `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/products.json?handle=${product.handle}&fields=id,variants,images`,
         { headers: { 'X-Shopify-Access-Token': crewAccessToken } }
       );
       if (!searchResp.ok) { failed++; continue; }
       const searchData = await searchResp.json();
       const products = searchData.products || [];
       if (products.length === 0) { failed++; continue; }
-      const productId = products[0].id;
+      const shopifyProduct = products[0];
+      const productId = shopifyProduct.id;
 
-      // Write metafield
-      const metaResp = await fetch(
-        `https://${SHOPIFY_WRITE_CONFIG.crewShop}/admin/api/2026-01/products/${productId}/metafields.json`,
-        {
-          method: 'POST',
-          headers: {
-            'X-Shopify-Access-Token': crewAccessToken,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            metafield: {
-              namespace: 'custom',
-              key: 'product_info',
-              value: product.productInfo,
-              type: 'multi_line_text_field'
+      // Find image-1 URL with ?v=
+      const extensions = ['png', 'jpg', 'jpeg', 'webp'];
+      let img1Url = null;
+      for (const ext of extensions) {
+        const key = `${product.handle}-1.${ext}`;
+        if (fileMap[key]) { img1Url = fileMap[key]; break; }
+      }
+
+      // Set Variant Image on all variants
+      if (img1Url) {
+        for (const variant of (shopifyProduct.variants || [])) {
+          await fetch(
+            `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/variants/${variant.id}.json`,
+            {
+              method: 'PUT',
+              headers: { 'X-Shopify-Access-Token': crewAccessToken, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ variant: { id: variant.id, image_id: null } })
             }
-          })
+          );
         }
-      );
-      if (metaResp.ok) ok++;
-      else failed++;
+        // Find image id on product
+        const imgResp = await fetch(
+          `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/products/${productId}/images.json`,
+          { headers: { 'X-Shopify-Access-Token': crewAccessToken } }
+        );
+        if (imgResp.ok) {
+          const imgData = await imgResp.json();
+          const img = (imgData.images || []).find(i => i.src && i.src.includes(product.handle + '-1'));
+          if (img) {
+            for (const variant of (shopifyProduct.variants || [])) {
+              await fetch(
+                `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/variants/${variant.id}.json`,
+                {
+                  method: 'PUT',
+                  headers: { 'X-Shopify-Access-Token': crewAccessToken, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ variant: { id: variant.id, image_id: img.id } })
+                }
+              );
+            }
+          }
+        }
+      }
+
+      // Write Product Info metafield
+      if (product.productInfo) {
+        await fetch(
+          `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/products/${productId}/metafields.json`,
+          {
+            method: 'POST',
+            headers: { 'X-Shopify-Access-Token': crewAccessToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              metafield: {
+                namespace: 'custom',
+                key: 'product_info',
+                value: product.productInfo,
+                type: 'multi_line_text_field'
+              }
+            })
+          }
+        );
+      }
+
+      ok++;
     } catch(e) {
       failed++;
     }
   }
 
-  statusEl.textContent = `✅ Færdig! ${ok} produkter opdateret${failed > 0 ? ` · ${failed} fejlede` : ''}.`;
+  statusEl.textContent = `✅ Færdig! ${ok} produkter færdiggjort${failed > 0 ? ` · ${failed} fejlede` : ''}.`;
   btn.disabled = false;
 }
 
@@ -2881,10 +2941,9 @@ function shopifyHandleCallback() {
   const code = params.get('code');
   const shop = params.get('shop');
   const stateParam = params.get('state');
-  // Only handle Shopify callback if state starts with 'crew_' or 'shopify_'
   if (code && shop && stateParam && (stateParam.startsWith('crew_') || stateParam.startsWith('shopify_'))) {
     document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⏳ Logger ind...</h2><p>Vent venligst...</p></div>';
-    fetch(SHOPIFY_WRITE_CONFIG.netlifyToken, {
+    fetch('https://shopify-generator-functions.netlify.app/.netlify/functions/shopify-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ shop, code })
