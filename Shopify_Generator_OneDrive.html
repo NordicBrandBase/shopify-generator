@@ -2909,12 +2909,21 @@ async function finalizeProducts() {
         }
       }
 
-      // Write Product Info metafield — POST (creates or overwrites)
+      // Write Product Info metafield — PUT hvis felt har indhold, POST hvis tomt
       if (product.productInfo) {
         const richText = htmlToRichText(product.productInfo);
-        await shopifyAPI('POST', `/admin/api/2026-01/products/${productId}/metafields.json`, {
-          metafield: { namespace: 'custom', key: 'product_info', value: JSON.stringify(richText), type: 'rich_text_field' }
-        });
+        const richTextJson = JSON.stringify(richText);
+        const existingMf = await shopifyAPI('GET', `/admin/api/2026-01/products/${productId}/metafields.json?namespace=custom&key=product_info`);
+        const existing = (existingMf.metafields || [])[0];
+        if (existing) {
+          await shopifyAPI('PUT', `/admin/api/2026-01/metafields/${existing.id}.json`, {
+            metafield: { id: existing.id, value: richTextJson, type: 'rich_text_field' }
+          });
+        } else {
+          await shopifyAPI('POST', `/admin/api/2026-01/products/${productId}/metafields.json`, {
+            metafield: { namespace: 'custom', key: 'product_info', value: richTextJson, type: 'rich_text_field' }
+          });
+        }
       }
 
       ok++;
