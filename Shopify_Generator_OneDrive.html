@@ -959,10 +959,8 @@ async function handleFile(event, type) {
 
   if (type === 'meta') {
     state.metaWB = wb;
-    // Populate sheet selector
     const sel = document.getElementById('meta-sheet-select');
     sel.innerHTML = wb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
-    // Auto-select first sheet that starts with 'metadata', otherwise first sheet
     const autoSheet = wb.SheetNames.find(n => n.toLowerCase().startsWith('metadata')) || wb.SheetNames[0];
     sel.value = autoSheet;
     document.getElementById('meta-sheet-selector').style.display = 'flex';
@@ -1100,8 +1098,8 @@ async function unzipDocx(arrayBuffer) {
 function buildBrandList() {
   const brands = new Set();
   if (state.metaData && state.metaHeaders) {
-    const brandCol = state.metaHeaders.findIndex(v => v && String(v).toLowerCase().includes('attributter brand'));
-    const col = brandCol >= 0 ? brandCol : 102;
+    const brandColIdx = state.metaHeaders.findIndex(v => v && String(v).toLowerCase().includes('attributter brand'));
+    const col = brandColIdx >= 0 ? brandColIdx : 102;
     for (const row of state.metaData) {
       const b = row[col];
       if (b && String(b).trim()) brands.add(String(b).trim());
@@ -1786,11 +1784,8 @@ async function generate() {
   const missingPrices = new Set();
   const missingTexts = new Set();
   const missingImages = new Set();
-
-  // Collect selected rows first
-  const selectedRows = [];
   for (const row of state.metaData) {
-    const sku = row[1], name = row[2], brand = row[CI.BRAND];
+    const sku = row[CI.SKU], name = row[CI.NAME], brand = row[CI.BRAND];
     if (!sku || !name || !brand) continue;
     const brandKey = String(brand).trim();
     const isSelected = [...state.selectedBrands].some(b =>
@@ -1804,16 +1799,12 @@ async function generate() {
       const seo = findSeoData(seoMap, name, brandKey);
       if (!seo.seoTitle && !seo.shortDesc && !seo.longDesc) missingTexts.add(name);
     }
-    selectedRows.push({ name, brandKey });
-  }
-
-  // Check images in parallel
-  await Promise.all(selectedRows.map(async ({ name }) => {
+    // Check images via CDN
     const handle = makeHandle(name);
     const testUrl = `${SHOPIFY_CDN.crew}${handle}-1.png`;
     const hasImg = await imageExists(testUrl);
     if (!hasImg) missingImages.add(name);
-  }));
+  }
 
   if (missingPrices.size > 0 || missingTexts.size > 0 || missingImages.size > 0) {
     const proceed = await new Promise(resolve => {
@@ -1873,8 +1864,8 @@ async function generate() {
     return idx >= 0 ? idx : null;
   }
   const CI = {
-    SKU:          findCol(['BC Vare', 'Vare\nNummer', 'SKU']) ?? 1,
-    NAME:         findCol(['Vare\nBeskrivelse', 'Beskrivelse', 'Name']) ?? 2,
+    SKU:          findCol(['BC Vare', 'Vare nummer', 'SKU']) ?? 1,
+    NAME:         findCol(['Beskrivelse', 'Name']) ?? 2,
     GTIN:         findCol(['GTIN']) ?? 7,
     NETWEIGHT:    findCol(['Nettovægt', 'Netweight']) ?? 24,
     BRAND:        findCol(['Attributter Brand']) ?? 102,
@@ -1889,7 +1880,6 @@ async function generate() {
     INGREDIENTS:  findCol(['Ingrediens']) ?? 111,
     UFI:          findCol(['UFI']) ?? 112,
   };
-  addLog('info', 'META', `Kolonner: BRAND=${CI.BRAND} FORMAT=${CI.FORMAT} STRENGTH=${CI.STRENGTH} UFI=${CI.UFI}`);
 
   const outputRows = [ZEUS_HEADERS];
   const corpRows = [SNUSCORP_HEADERS];
@@ -2699,19 +2689,19 @@ async function odFetchAll() {
     document.getElementById('od-meta-tag')
   );
   if (metaBuffer) {
+    // Simulate file load for meta
     const wb = XLSX.read(metaBuffer, { type: 'array', cellFormula: false, cellNF: false, raw: false });
-    state.metaWB = wb;
-    // Populate sheet selector
-    const sel = document.getElementById('meta-sheet-select');
-    sel.innerHTML = wb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
-    const autoSheet = wb.SheetNames.find(n => n.toLowerCase().startsWith('metadata')) || wb.SheetNames[0];
-    sel.value = autoSheet;
-    document.getElementById('meta-sheet-selector').style.display = 'flex';
-    document.getElementById('meta-name').textContent = OD_CONFIG.files.meta.label;
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'metadata') || wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    state.metaHeaders = rows[0];
+    state.metaData = rows.slice(1).filter(r => r.some(v => v !== null));
+    document.getElementById('meta-name').textContent = OD_CONFIG.files.meta.label + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
     document.getElementById('zone-meta').classList.add('has-file');
     document.getElementById('meta-badge').className = 'upload-badge';
     document.getElementById('meta-badge').textContent = '✓ INDLÆST';
-    selectMetaSheet(autoSheet);
+    addLog('ok', 'META', `${OD_CONFIG.files.meta.label} — ${state.metaData.length} produkter`);
+    buildBrandList();
   }
 
   // Fetch price
