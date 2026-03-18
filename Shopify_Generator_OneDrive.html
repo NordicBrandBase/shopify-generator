@@ -896,6 +896,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Product Info sektion -->
+    <div style="margin-top:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px;">
+      <div style="font-family:'Syne',sans-serif; font-weight:700; font-size:13px; margin-bottom:8px;">🛍 Skriv Product Info til SnusCrew</div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">Efter CSV-import i Shopify — klik her for at skrive product_info metafeltet direkte på alle genererede produkter.</div>
+      <button class="download-btn" id="product-info-btn" onclick="writeProductInfo()" style="background:rgba(14,166,114,0.1); border-color:var(--success-border); color:var(--green);">✏️ Skriv Product Info til SnusCrew</button>
+      <div id="product-info-status" style="margin-top:10px; font-size:12px; color:var(--muted);"></div>
+    </div>
   </div>
 
 </div>
@@ -2023,6 +2031,15 @@ async function generate() {
 
     outputRows.push(r1, r2, r3);
 
+    // Store Product Info for later Shopify write
+    if (!state.productInfoData) state.productInfoData = [];
+    if (r1[C['Product Info (product.metafields.custom.product_info)']]) {
+      state.productInfoData.push({
+        handle,
+        productInfo: r1[C['Product Info (product.metafields.custom.product_info)']]
+      });
+    }
+
     // Extra image rows (only Handle + Image Src + Image Position)
     if (img2) {
       const imgRow2 = emptyRow();
@@ -2753,13 +2770,148 @@ async function findShopifyImages(handle, cdnBase) {
       if (await imageExists(url)) { found = url; break; }
     }
     if (found) images.push(found);
-    else break; // Stop at first missing
+    else break;
   }
   return images;
 }
 
+// ============================================================
+// SHOPIFY PRODUCT INFO WRITER
+// ============================================================
+const SHOPIFY_WRITE_CONFIG = {
+  clientId: '447c2cc5be07b401f8a965226fb835be',
+  netlifyAuth: 'https://shopify-generator-functions.netlify.app/.netlify/functions/shopify-auth',
+  netlifyToken: 'https://shopify-generator-functions.netlify.app/.netlify/functions/shopify-token',
+  redirectUri: 'https://nordicbrandbase.github.io/shopify-generator/Shopify_Generator_OneDrive.html',
+  crewShop: 'btem8k-va.myshopify.com'
+};
+
+let crewAccessToken = null;
+
+// Login to SnusCrew via OAuth popup
+function shopifyCrewLogin() {
+  return new Promise((resolve) => {
+    const stateKey = 'crew_product_info';
+    const authUrl = `${SHOPIFY_WRITE_CONFIG.netlifyAuth}?shop=${SHOPIFY_WRITE_CONFIG.crewShop}&state=${stateKey}`;
+    const popup = window.open(authUrl, 'shopify_crew_login', 'width=600,height=700,scrollbars=yes');
+    const handler = (event) => {
+      if (event.data && event.data.type === 'shopify_token' && event.data.shop === SHOPIFY_WRITE_CONFIG.crewShop) {
+        window.removeEventListener('message', handler);
+        resolve(event.data.token);
+      }
+    };
+    window.addEventListener('message', handler);
+    setTimeout(() => { window.removeEventListener('message', handler); resolve(null); }, 120000);
+  });
+}
+
+// Handle OAuth callback in popup window
+function shopifyHandleCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const shop = params.get('shop');
+  const stateParam = params.get('state');
+  if (code && shop && stateParam) {
+    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⏳ Logger ind...</h2><p>Vent venligst...</p></div>';
+    fetch(SHOPIFY_WRITE_CONFIG.netlifyToken, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shop, code })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.access_token && window.opener) {
+        window.opener.postMessage({ type: 'shopify_token', shop, token: data.access_token }, '*');
+        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>✅ Forbundet!</h2><p>Dette vindue lukker automatisk...</p></div>';
+        setTimeout(() => window.close(), 1500);
+      } else {
+        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ Fejl</h2><p>' + JSON.stringify(data) + '</p></div>';
+      }
+    })
+    .catch(e => {
+      document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ Fejl</h2><p>' + e.message + '</p></div>';
+    });
+    return true;
+  }
+  return false;
+}
+
+async function writeProductInfo() {
+  if (!state.productInfoData || state.productInfoData.length === 0) {
+    document.getElementById('product-info-status').textContent = '⚠️ Ingen Product Info data — generér filer først.';
+    return;
+  }
+
+  const btn = document.getElementById('product-info-btn');
+  const statusEl = document.getElementById('product-info-status');
+  btn.disabled = true;
+  statusEl.textContent = '⏳ Logger ind på SnusCrew...';
+
+  // Login if needed
+  if (!crewAccessToken) {
+    crewAccessToken = await shopifyCrewLogin();
+  }
+
+  if (!crewAccessToken) {
+    statusEl.textContent = '⚠️ Login fejlede — prøv igen.';
+    btn.disabled = false;
+    return;
+  }
+
+  statusEl.textContent = `⏳ Skriver Product Info til ${state.productInfoData.length} produkter...`;
+
+  let ok = 0, failed = 0;
+
+  for (const product of state.productInfoData) {
+    if (!product.handle || !product.productInfo) continue;
+    try {
+      // Find product by handle
+      const searchResp = await fetch(
+        `https://${SHOPIFY_WRITE_CONFIG.crewShop}/admin/api/2026-01/products.json?handle=${product.handle}&fields=id`,
+        { headers: { 'X-Shopify-Access-Token': crewAccessToken } }
+      );
+      if (!searchResp.ok) { failed++; continue; }
+      const searchData = await searchResp.json();
+      const products = searchData.products || [];
+      if (products.length === 0) { failed++; continue; }
+      const productId = products[0].id;
+
+      // Write metafield
+      const metaResp = await fetch(
+        `https://${SHOPIFY_WRITE_CONFIG.crewShop}/admin/api/2026-01/products/${productId}/metafields.json`,
+        {
+          method: 'POST',
+          headers: {
+            'X-Shopify-Access-Token': crewAccessToken,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            metafield: {
+              namespace: 'custom',
+              key: 'product_info',
+              value: product.productInfo,
+              type: 'multi_line_text_field'
+            }
+          })
+        }
+      );
+      if (metaResp.ok) ok++;
+      else failed++;
+    } catch(e) {
+      failed++;
+    }
+  }
+
+  statusEl.textContent = `✅ Færdig! ${ok} produkter opdateret${failed > 0 ? ` · ${failed} fejlede` : ''}.`;
+  btn.disabled = false;
+}
+}
+
 // Init MSAL
-odInit();
+const _isCallback = shopifyHandleCallback();
+if (!_isCallback) {
+  odInit();
+}
 </script>
 </body>
 </html>
