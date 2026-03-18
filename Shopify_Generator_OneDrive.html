@@ -2694,19 +2694,18 @@ async function odFetchAll() {
     document.getElementById('od-meta-tag')
   );
   if (metaBuffer) {
-    // Simulate file load for meta
     const wb = XLSX.read(metaBuffer, { type: 'array', cellFormula: false, cellNF: false, raw: false });
-    const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'metadata') || wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-    state.metaHeaders = rows[0];
-    state.metaData = rows.slice(1).filter(r => r.some(v => v !== null) && r[0] === true);
-    document.getElementById('meta-name').textContent = OD_CONFIG.files.meta.label + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
+    state.metaWB = wb;
+    const sel = document.getElementById('meta-sheet-select');
+    sel.innerHTML = wb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+    const autoSheet = wb.SheetNames.find(n => n.toLowerCase().startsWith('metadata')) || wb.SheetNames[0];
+    sel.value = autoSheet;
+    document.getElementById('meta-sheet-selector').style.display = 'flex';
+    document.getElementById('meta-name').textContent = OD_CONFIG.files.meta.label;
     document.getElementById('zone-meta').classList.add('has-file');
     document.getElementById('meta-badge').className = 'upload-badge';
     document.getElementById('meta-badge').textContent = '✓ INDLÆST';
-    addLog('ok', 'META', `${OD_CONFIG.files.meta.label} — ${state.metaData.length} produkter`);
-    buildBrandList();
+    selectMetaSheet(autoSheet);
   }
 
   // Fetch price
