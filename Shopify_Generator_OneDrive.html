@@ -2794,7 +2794,7 @@ function shopifyCrewLogin() {
     const authUrl = `https://${SHOPIFY_CONFIG2.crewShop}/admin/oauth/authorize?client_id=${SHOPIFY_CONFIG2.clientId}&scope=${scopes}&redirect_uri=${redirectUri}&state=crew_finalize`;
     
     // Clear any old token
-    sessionStorage.removeItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
+    localStorage.removeItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
     
     window.open(authUrl, 'shopify_crew_login', 'width=600,height=700,scrollbars=yes');
     
@@ -2810,11 +2810,11 @@ function shopifyCrewLogin() {
     
     // Also poll sessionStorage every second as fallback
     const pollInterval = setInterval(() => {
-      const token = sessionStorage.getItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
+      const token = localStorage.getItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
       if (token) {
         clearInterval(pollInterval);
         window.removeEventListener('message', handler);
-        sessionStorage.removeItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
+        localStorage.removeItem('shopify_token_' + SHOPIFY_CONFIG2.crewShop);
         resolve(token);
       }
     }, 1000);
@@ -2965,7 +2965,7 @@ function shopifyHandleCallback() {
   const shop = params.get('shop');
   const stateParam = params.get('state');
   if (code && shop && stateParam && (stateParam.startsWith('crew_') || stateParam.startsWith('shopify_'))) {
-    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⏳ Logger ind...</h2><p>Vent venligst...</p></div>';
+    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;color:#1b3b6a;"><h2>⏳ Logger ind...</h2><p>Vent venligst...</p></div>';
     fetch('https://shopify-generator-functions.netlify.app/.netlify/functions/shopify-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2974,20 +2974,18 @@ function shopifyHandleCallback() {
     .then(r => r.json())
     .then(data => {
       if (data.access_token) {
-        // Store token in sessionStorage so main window can pick it up
-        sessionStorage.setItem('shopify_token_' + shop, data.access_token);
-        // Also try postMessage if opener exists
-        if (window.opener) {
-          window.opener.postMessage({ type: 'shopify_token', shop, token: data.access_token }, '*');
-        }
-        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>✅ Forbundet!</h2><p>Dette vindue lukker automatisk...</p></div>';
-        setTimeout(() => window.close(), 1500);
+        // Store in sessionStorage
+        localStorage.setItem('shopify_token_' + shop, data.access_token);
+        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;color:#1b3b6a;"><h2>✅ Forbundet!</h2><p>Du kan lukke dette vindue og gå tilbage til appen.</p></div>';
+        // Try to close if popup
+        try { if (window.opener) { window.opener.postMessage({ type: 'shopify_token', shop, token: data.access_token }, '*'); } } catch(e) {}
+        setTimeout(() => { try { window.close(); } catch(e) {} }, 1500);
       } else {
-        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ Fejl</h2><p>' + JSON.stringify(data) + '</p></div>';
+        document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;color:#1b3b6a;"><h2>⚠️ Fejl</h2><p>' + JSON.stringify(data) + '</p></div>';
       }
     })
     .catch(e => {
-      document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ Fejl</h2><p>' + e.message + '</p></div>';
+      document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;text-align:center;color:#1b3b6a;"><h2>⚠️ Fejl</h2><p>' + e.message + '</p></div>';
     });
     return true;
   }
