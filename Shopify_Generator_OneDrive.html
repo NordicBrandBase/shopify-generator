@@ -2860,24 +2860,7 @@ async function finalizeProducts() {
     return;
   }
 
-  // Fetch all files from SnusCrew via proxy
-  statusEl.textContent = '⏳ Henter billedfiler fra SnusCrew...';
-  const fileMap = {};
-  try {
-    const data = await shopifyAPI('GET', '/admin/api/2026-01/files.json?content_type=IMAGE&limit=250');
-    for (const file of (data.files || [])) {
-      if (file.url) {
-        const filename = file.url.split('/').pop().split('?')[0].toLowerCase();
-        fileMap[filename] = file.url;
-      }
-    }
-    addLog('ok', 'SHOPIFY', `${Object.keys(fileMap).length} filer hentet fra SnusCrew`);
-  } catch(e) {
-    addLog('warn', 'SHOPIFY', 'Kunne ikke hente filer: ' + e.message);
-    statusEl.textContent = '⚠️ Fejl ved hentning af filer: ' + e.message;
-    btn.disabled = false;
-    return;
-  }
+  // Vi bruger ikke files.json — billeder findes direkte på produktet
 
   let ok = 0, failed = 0;
   statusEl.textContent = `⏳ Færdiggør ${state.productInfoData.length} produkter...`;
@@ -2895,29 +2878,13 @@ async function finalizeProducts() {
       const shopifyProduct = products[0];
       const productId = shopifyProduct.id;
 
-      // Find image-1 URL with ?v=
-      const extensions = ['png', 'jpg', 'jpeg', 'webp'];
-      let img1Url = null;
-      for (const ext of extensions) {
-        const key = `${product.handle}-1.${ext}`;
-        if (fileMap[key]) { img1Url = fileMap[key]; break; }
-      }
-
-      // Find image id on product and set on all variants
-      if (img1Url) {
-        const imgData = await shopifyAPI('GET', `/admin/api/2026-01/products/${productId}/images.json`);
-        const img = (imgData.images || []).find(i => i.src && i.src.includes(product.handle + '-1'));
-        if (img) {
-          for (const variant of (shopifyProduct.variants || [])) {
-            const varResult = await shopifyAPI('PUT', `/admin/api/2026-01/variants/${variant.id}.json`, { variant: { id: variant.id, image_id: img.id } });
-            if (varResult.errors) addLog('warn', 'SHOPIFY', `${product.handle} variant ${variant.id}: ${JSON.stringify(varResult.errors)}`);
-          }
-          addLog('ok', 'SHOPIFY', `${product.handle}: variant image sat ✓`);
-        } else {
-          addLog('warn', 'SHOPIFY', `${product.handle}: billede ikke fundet på produktet (filen findes i CDN men ikke uploadet som produktbillede)`);
+      // Find image-1 on product and set on all variants
+      const imgData = await shopifyAPI('GET', `/admin/api/2026-01/products/${productId}/images.json`);
+      const img = (imgData.images || []).find(i => i.src && i.src.includes(product.handle + '-1'));
+      if (img) {
+        for (const variant of (shopifyProduct.variants || [])) {
+          await shopifyAPI('PUT', `/admin/api/2026-01/variants/${variant.id}.json`, { variant: { id: variant.id, image_id: img.id } });
         }
-      } else {
-        addLog('info', 'SHOPIFY', `${product.handle}: ingen CDN-fil fundet — variant image sprunget over`);
       }
 
       // Write Product Info metafield — find existing id and PUT
