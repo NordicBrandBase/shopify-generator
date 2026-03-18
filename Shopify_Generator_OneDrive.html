@@ -771,6 +771,13 @@
           <div class="upload-optional" id="meta-badge">XLSX / CSV</div>
         </div>
 
+        <div id="meta-sheet-selector" style="display:none; align-items:center; gap:8px; margin-top:8px; padding:6px 12px; background:var(--surface2); border-radius:8px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">Vælg ark:</span>
+          <select id="meta-sheet-select" onchange="selectMetaSheet(this.value)"
+            style="background:var(--bg-input,#f8faff); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:4px 10px; font-size:13px; cursor:pointer; max-width:300px; flex:1;">
+          </select>
+        </div>
+
         <div class="upload-zone" id="zone-price">
           <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFile(event,'price')">
           <div class="upload-icon">💰</div>
@@ -946,21 +953,25 @@ async function handleFile(event, type) {
 
   const data = await file.arrayBuffer();
   const wb = XLSX.read(data, { type: 'array', cellFormula: false, cellNF: false, raw: false });
-  const sheetName = (type === 'meta')
-    ? (wb.SheetNames.find(n => n.toLowerCase() === 'metadata') || wb.SheetNames[0])
-    : wb.SheetNames[0];
+  const sheetName = wb.SheetNames[0];
   const ws = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
   if (type === 'meta') {
-    state.metaHeaders = rows[0];
-    state.metaData = rows.slice(1).filter(r => r.some(v => v !== null));
-    document.getElementById('meta-name').textContent = file.name + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
+    state.metaWB = wb;
+    // Populate sheet selector
+    const sel = document.getElementById('meta-sheet-select');
+    sel.innerHTML = wb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+    // Auto-select first sheet that starts with 'metadata', otherwise first sheet
+    const autoSheet = wb.SheetNames.find(n => n.toLowerCase().startsWith('metadata')) || wb.SheetNames[0];
+    sel.value = autoSheet;
+    document.getElementById('meta-sheet-selector').style.display = 'flex';
+    document.getElementById('meta-name').textContent = file.name;
     document.getElementById('zone-meta').classList.add('has-file');
     document.getElementById('meta-badge').className = 'upload-badge';
     document.getElementById('meta-badge').textContent = '✓ INDLÆST';
-    addLog('ok', 'META', `${file.name} — ${state.metaData.length} produkter fundet`);
-    buildBrandList();
+    selectMetaSheet(autoSheet);
+    return;
   }
 
   if (type === 'price') {
@@ -1693,6 +1704,21 @@ function buildCorpRows(params) {
 }
 
 
+
+function selectMetaSheet(sheetName) {
+  if (!state.metaWB) return;
+  const ws = state.metaWB.Sheets[sheetName];
+  if (!ws) return;
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  state.metaHeaders = rows[0];
+  state.metaData = rows.slice(1).filter(r => r.some(v => v !== null));
+  document.getElementById('meta-name').textContent =
+    document.getElementById('meta-name').textContent.split(' ·')[0]
+    + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
+  addLog('ok', 'META', `Ark skiftet til "${sheetName}" — ${state.metaData.length} produkter`);
+  buildBrandList();
+  checkReady();
+}
 
 function selectPriceSheet(sheetName) {
   if (!state.priceWB) return;
@@ -2648,19 +2674,19 @@ async function odFetchAll() {
     document.getElementById('od-meta-tag')
   );
   if (metaBuffer) {
-    // Simulate file load for meta
     const wb = XLSX.read(metaBuffer, { type: 'array', cellFormula: false, cellNF: false, raw: false });
-    const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'metadata') || wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-    state.metaHeaders = rows[0];
-    state.metaData = rows.slice(1).filter(r => r.some(v => v !== null));
-    document.getElementById('meta-name').textContent = OD_CONFIG.files.meta.label + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
+    state.metaWB = wb;
+    // Populate sheet selector
+    const sel = document.getElementById('meta-sheet-select');
+    sel.innerHTML = wb.SheetNames.map(n => `<option value="${n}">${n}</option>`).join('');
+    const autoSheet = wb.SheetNames.find(n => n.toLowerCase().startsWith('metadata')) || wb.SheetNames[0];
+    sel.value = autoSheet;
+    document.getElementById('meta-sheet-selector').style.display = 'flex';
+    document.getElementById('meta-name').textContent = OD_CONFIG.files.meta.label;
     document.getElementById('zone-meta').classList.add('has-file');
     document.getElementById('meta-badge').className = 'upload-badge';
     document.getElementById('meta-badge').textContent = '✓ INDLÆST';
-    addLog('ok', 'META', `${OD_CONFIG.files.meta.label} — ${state.metaData.length} produkter`);
-    buildBrandList();
+    selectMetaSheet(autoSheet);
   }
 
   // Fetch price
