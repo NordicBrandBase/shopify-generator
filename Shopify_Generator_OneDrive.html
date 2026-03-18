@@ -2827,6 +2827,17 @@ function shopifyCrewLogin() {
   });
 }
 
+const NETLIFY_API = 'https://shopify-generator-functions.netlify.app/.netlify/functions/shopify-api';
+
+async function shopifyAPI(method, path, body) {
+  const resp = await fetch(NETLIFY_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ shop: SHOPIFY_CONFIG2.crewShop, token: crewAccessToken, method, path, body })
+  });
+  return resp.json();
+}
+
 async function finalizeProducts() {
   if (!state.productInfoData || state.productInfoData.length === 0) {
     document.getElementById('product-info-status').textContent = '⚠️ Ingen produkter — generér filer først.';
@@ -2847,21 +2858,15 @@ async function finalizeProducts() {
     return;
   }
 
-  // Fetch all files from SnusCrew to get ?v= URLs
+  // Fetch all files from SnusCrew via proxy
   statusEl.textContent = '⏳ Henter billedfiler fra SnusCrew...';
   const fileMap = {};
   try {
-    const resp = await fetch(
-      `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/files.json?content_type=IMAGE&limit=250`,
-      { headers: { 'X-Shopify-Access-Token': crewAccessToken } }
-    );
-    if (resp.ok) {
-      const data = await resp.json();
-      for (const file of (data.files || [])) {
-        if (file.url) {
-          const filename = file.url.split('/').pop().split('?')[0].toLowerCase();
-          fileMap[filename] = file.url; // Keep full URL with ?v=
-        }
+    const data = await shopifyAPI('GET', '/admin/api/2026-01/files.json?content_type=IMAGE&limit=250');
+    for (const file of (data.files || [])) {
+      if (file.url) {
+        const filename = file.url.split('/').pop().split('?')[0].toLowerCase();
+        fileMap[filename] = file.url;
       }
     }
   } catch(e) {
@@ -2875,12 +2880,7 @@ async function finalizeProducts() {
     if (!product.handle) continue;
     try {
       // Find product by handle
-      const searchResp = await fetch(
-        `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/products.json?handle=${product.handle}&fields=id,variants,images`,
-        { headers: { 'X-Shopify-Access-Token': crewAccessToken } }
-      );
-      if (!searchResp.ok) { failed++; continue; }
-      const searchData = await searchResp.json();
+      const searchData = await shopifyAPI('GET', `/admin/api/2026-01/products.json?handle=${product.handle}&fields=id,variants,images`);
       const products = searchData.products || [];
       if (products.length === 0) { failed++; continue; }
       const shopifyProduct = products[0];
@@ -2894,58 +2894,22 @@ async function finalizeProducts() {
         if (fileMap[key]) { img1Url = fileMap[key]; break; }
       }
 
-      // Set Variant Image on all variants
+      // Find image id on product and set on all variants
       if (img1Url) {
-        for (const variant of (shopifyProduct.variants || [])) {
-          await fetch(
-            `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/variants/${variant.id}.json`,
-            {
-              method: 'PUT',
-              headers: { 'X-Shopify-Access-Token': crewAccessToken, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ variant: { id: variant.id, image_id: null } })
-            }
-          );
-        }
-        // Find image id on product
-        const imgResp = await fetch(
-          `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/products/${productId}/images.json`,
-          { headers: { 'X-Shopify-Access-Token': crewAccessToken } }
-        );
-        if (imgResp.ok) {
-          const imgData = await imgResp.json();
-          const img = (imgData.images || []).find(i => i.src && i.src.includes(product.handle + '-1'));
-          if (img) {
-            for (const variant of (shopifyProduct.variants || [])) {
-              await fetch(
-                `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/variants/${variant.id}.json`,
-                {
-                  method: 'PUT',
-                  headers: { 'X-Shopify-Access-Token': crewAccessToken, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ variant: { id: variant.id, image_id: img.id } })
-                }
-              );
-            }
+        const imgData = await shopifyAPI('GET', `/admin/api/2026-01/products/${productId}/images.json`);
+        const img = (imgData.images || []).find(i => i.src && i.src.includes(product.handle + '-1'));
+        if (img) {
+          for (const variant of (shopifyProduct.variants || [])) {
+            await shopifyAPI('PUT', `/admin/api/2026-01/variants/${variant.id}.json`, { variant: { id: variant.id, image_id: img.id } });
           }
         }
       }
 
       // Write Product Info metafield
       if (product.productInfo) {
-        await fetch(
-          `https://${SHOPIFY_CONFIG2.crewShop}/admin/api/2026-01/products/${productId}/metafields.json`,
-          {
-            method: 'POST',
-            headers: { 'X-Shopify-Access-Token': crewAccessToken, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              metafield: {
-                namespace: 'custom',
-                key: 'product_info',
-                value: product.productInfo,
-                type: 'multi_line_text_field'
-              }
-            })
-          }
-        );
+        await shopifyAPI('POST', `/admin/api/2026-01/products/${productId}/metafields.json`, {
+          metafield: { namespace: 'custom', key: 'product_info', value: product.productInfo, type: 'multi_line_text_field' }
+        });
       }
 
       ok++;
