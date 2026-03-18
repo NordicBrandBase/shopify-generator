@@ -1701,7 +1701,7 @@ function selectPriceSheet(sheetName) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
   state.priceData = rows;
   document.getElementById('price-name').textContent =
-    document.getElementById('price-sheet-select').closest('.upload-info').querySelector('.upload-filename').textContent.split(' ·')[0]
+    document.getElementById('price-name').textContent.split(' ·')[0]
     + ` · ark: "${sheetName}" (${rows.length} rækker)`;
   addLog('ok', 'PRIS', `Ark skiftet til "${sheetName}" — ${rows.length} rækker indlæst`);
   checkReady();
