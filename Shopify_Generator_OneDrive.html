@@ -1786,6 +1786,9 @@ async function generate() {
   const missingPrices = new Set();
   const missingTexts = new Set();
   const missingImages = new Set();
+
+  // Collect selected rows first
+  const selectedRows = [];
   for (const row of state.metaData) {
     const sku = row[1], name = row[2], brand = row[CI.BRAND];
     if (!sku || !name || !brand) continue;
@@ -1801,12 +1804,16 @@ async function generate() {
       const seo = findSeoData(seoMap, name, brandKey);
       if (!seo.seoTitle && !seo.shortDesc && !seo.longDesc) missingTexts.add(name);
     }
-    // Check images via CDN
+    selectedRows.push({ name, brandKey });
+  }
+
+  // Check images in parallel
+  await Promise.all(selectedRows.map(async ({ name }) => {
     const handle = makeHandle(name);
     const testUrl = `${SHOPIFY_CDN.crew}${handle}-1.png`;
     const hasImg = await imageExists(testUrl);
     if (!hasImg) missingImages.add(name);
-  }
+  }));
 
   if (missingPrices.size > 0 || missingTexts.size > 0 || missingImages.size > 0) {
     const proceed = await new Promise(resolve => {
