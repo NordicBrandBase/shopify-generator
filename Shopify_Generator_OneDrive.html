@@ -2840,6 +2840,35 @@ async function shopifyAPI(method, path, body) {
   return resp.json();
 }
 
+function htmlToRichText(html) {
+  // Convert simple HTML to Shopify rich_text_field JSON format
+  const children = [];
+  // Split on block-level tags
+  const blockRe = /<(h[1-6]|p|br)[^>]*>(.*?)<\/>|<br\s*\/?>/gi;
+  let lastIndex = 0;
+  let match;
+  const str = html.replace(/<br\s*\/?>/gi, '');
+  const blocks = str.match(/<(h[1-6]|p)[^>]*>[\s\S]*?<\/>/gi) || [];
+  for (const block of blocks) {
+    const headingMatch = block.match(/^<h([1-6])[^>]*>([\s\S]*?)<\/h[1-6]>/i);
+    const paraMatch = block.match(/^<p[^>]*>([\s\S]*?)<\/p>/i);
+    if (headingMatch) {
+      const level = parseInt(headingMatch[1]);
+      const text = headingMatch[2].replace(/<[^>]+>/g, '').trim();
+      if (text) children.push({ type: 'heading', level, children: [{ type: 'text', value: text }] });
+    } else if (paraMatch) {
+      const text = paraMatch[1].replace(/<[^>]+>/g, '').trim();
+      if (text) children.push({ type: 'paragraph', children: [{ type: 'text', value: text }] });
+    }
+  }
+  if (children.length === 0) {
+    // Fallback: plain text as paragraph
+    const text = html.replace(/<[^>]+>/g, '').trim();
+    if (text) children.push({ type: 'paragraph', children: [{ type: 'text', value: text }] });
+  }
+  return { type: 'root', children };
+}
+
 async function finalizeProducts() {
   if (!state.productInfoData || state.productInfoData.length === 0) {
     document.getElementById('product-info-status').textContent = '⚠️ Ingen produkter — generér filer først.';
@@ -2887,13 +2916,14 @@ async function finalizeProducts() {
         }
       }
 
-      // Write Product Info metafield — find existing id and PUT
+      // Write Product Info metafield — convert HTML to Shopify rich_text_field JSON, then PUT
       if (product.productInfo) {
         const existingMf = await shopifyAPI('GET', `/admin/api/2026-01/products/${productId}/metafields.json?namespace=custom&key=product_info`);
         const existing = (existingMf.metafields || [])[0];
         if (existing) {
+          const richText = htmlToRichText(product.productInfo);
           await shopifyAPI('PUT', `/admin/api/2026-01/metafields/${existing.id}.json`, {
-            metafield: { id: existing.id, value: product.productInfo, type: 'multi_line_text_field' }
+            metafield: { id: existing.id, value: JSON.stringify(richText), type: 'rich_text_field' }
           });
         }
       }
