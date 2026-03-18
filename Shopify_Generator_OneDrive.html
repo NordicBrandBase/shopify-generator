@@ -1097,11 +1097,9 @@ async function unzipDocx(arrayBuffer) {
 // ============================================================
 function buildBrandList() {
   const brands = new Set();
-  if (state.metaData && state.metaHeaders) {
-    const brandColIdx = state.metaHeaders.findIndex(v => v && String(v).toLowerCase().includes('attributter brand'));
-    const col = brandColIdx >= 0 ? brandColIdx : 102;
+  if (state.metaData) {
     for (const row of state.metaData) {
-      const b = row[col];
+      const b = row[state.metaCols ? state.metaCols.BRAND : 102];
       if (b && String(b).trim()) brands.add(String(b).trim());
     }
   }
@@ -1143,10 +1141,8 @@ function selectBrand(brand) {
   skuGrid.innerHTML = '';
   state.brandProducts = [];
 
-  const brandColIdx = state.metaHeaders ? state.metaHeaders.findIndex(v => v && String(v).toLowerCase().includes('attributter brand')) : 102;
-  const brandCol = brandColIdx >= 0 ? brandColIdx : 102;
   for (const row of state.metaData) {
-    const rowBrand = row[brandCol];
+    const rowBrand = row[state.metaCols ? state.metaCols.BRAND : 102];
     if (!rowBrand || String(rowBrand).trim() !== brand) continue;
     const sku = row[1];
     const name = row[2];
@@ -1713,11 +1709,33 @@ function selectMetaSheet(sheetName) {
   if (!ws) return;
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
   state.metaHeaders = rows[0];
-  state.metaData = rows.slice(1).filter(r => r.some(v => v !== null));
+  state.metaData = rows.slice(1).filter(r => r.some(v => v !== null) && r[0] === true);
+  // Byg kolonne-indeks map fra headers
+  state.metaCols = {};
+  const hh = state.metaHeaders;
+  function mc(keywords) {
+    const i = hh.findIndex(v => v && keywords.some(k => String(v).toLowerCase().includes(k.toLowerCase())));
+    return i >= 0 ? i : null;
+  }
+  state.metaCols.SKU          = mc(['BC Vare'])                      ?? 1;
+  state.metaCols.NAME         = mc(['Beskrivelse'])                  ?? 2;
+  state.metaCols.GTIN         = mc(['GTIN'])                        ?? 7;
+  state.metaCols.NETWEIGHT    = mc(['Nettovægt', 'Netweight'])      ?? 24;
+  state.metaCols.BRAND        = mc(['Attributter Brand'])           ?? 102;
+  state.metaCols.MGG          = mc(['mg/g', 'mg per gram'])         ?? 103;
+  state.metaCols.FORMAT       = mc(['Attributter Format'])          ?? 104;
+  state.metaCols.MGPOUCH      = mc(['MG per pouch'])                ?? 105;
+  state.metaCols.POUCHES      = mc(['Pouch per can'])               ?? 106;
+  state.metaCols.POUCHW       = mc(['pouch weight'])                ?? 107;
+  state.metaCols.STRENGTH     = mc(['Strength group'])              ?? 108;
+  state.metaCols.TASTE        = mc(['Taste profil', 'flavour'])     ?? 109;
+  state.metaCols.MANUFACTURER = mc(['Producent', 'Manufacturer'])   ?? 110;
+  state.metaCols.INGREDIENTS  = mc(['Ingrediens'])                  ?? 111;
+  state.metaCols.UFI          = mc(['UFI'])                         ?? 112;
   document.getElementById('meta-name').textContent =
     document.getElementById('meta-name').textContent.split(' ·')[0]
     + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
-  addLog('ok', 'META', `Ark skiftet til "${sheetName}" — ${state.metaData.length} produkter`);
+  addLog('ok', 'META', `Ark: "${sheetName}" — ${state.metaData.length} rækker`);
   buildBrandList();
   checkReady();
 }
@@ -1785,7 +1803,7 @@ async function generate() {
   const missingTexts = new Set();
   const missingImages = new Set();
   for (const row of state.metaData) {
-    const sku = row[CI.SKU], name = row[CI.NAME], brand = row[CI.BRAND];
+    const sku = row[state.metaCols ? state.metaCols.SKU : 1], name = row[state.metaCols ? state.metaCols.NAME : 2], brand = row[state.metaCols ? state.metaCols.BRAND : 102];
     if (!sku || !name || !brand) continue;
     const brandKey = String(brand).trim();
     const isSelected = [...state.selectedBrands].some(b =>
@@ -1857,28 +1875,15 @@ async function generate() {
     if (!proceed) { document.getElementById('gen-btn').disabled = false; return; }
   }
 
-  // Metadata column indices — resolved dynamically from header row
-  const h = state.metaHeaders || [];
-  function findCol(keywords) {
-    const idx = h.findIndex(v => v && keywords.some(kw => String(v).toLowerCase().includes(kw.toLowerCase())));
-    return idx >= 0 ? idx : null;
-  }
+  // Metadata column indices (0-based)
+  // B=1(SKU), C=2(Name), H=7(GTIN), Y=24(NetWeight), CY=102(Brand), CZ=103(mg/g),
+  // DA=104(Format), DB=105(mg/pouch), DC=106(Pouches/can), DD=107(PouchWeight),
+  // DE=108(Strength), DF=109(Taste), DG=110(Manufacturer), DH=111(Ingredients), DI=112(UFI)
   const CI = {
-    SKU:          findCol(['BC Vare', 'Vare nummer', 'SKU']) ?? 1,
-    NAME:         findCol(['Beskrivelse', 'Name']) ?? 2,
-    GTIN:         findCol(['GTIN']) ?? 7,
-    NETWEIGHT:    findCol(['Nettovægt', 'Netweight']) ?? 24,
-    BRAND:        findCol(['Attributter Brand']) ?? 102,
-    MGG:          findCol(['MG/G', 'mg/g', 'mg per gram']) ?? 103,
-    FORMAT:       findCol(['Attributter Format']) ?? 104,
-    MGPOUCH:      findCol(['MG per pouch', 'mg per pouch']) ?? 105,
-    POUCHES:      findCol(['Pouch per can']) ?? 106,
-    POUCHW:       findCol(['pouch weight']) ?? 107,
-    STRENGTH:     findCol(['Strength group']) ?? 108,
-    TASTE:        findCol(['Taste profil', 'flavour']) ?? 109,
-    MANUFACTURER: findCol(['Producent', 'Manufacturer']) ?? 110,
-    INGREDIENTS:  findCol(['Ingrediens']) ?? 111,
-    UFI:          findCol(['UFI']) ?? 112,
+    SKU: (state.metaCols||{}).SKU ?? 1, NAME: (state.metaCols||{}).NAME ?? 2, GTIN: (state.metaCols||{}).GTIN ?? 7, NETWEIGHT: (state.metaCols||{}).NETWEIGHT ?? 24,
+    BRAND: (state.metaCols||{}).BRAND ?? 102, MGG: (state.metaCols||{}).MGG ?? 103, FORMAT: (state.metaCols||{}).FORMAT ?? 104, MGPOUCH: (state.metaCols||{}).MGPOUCH ?? 105,
+    POUCHES: (state.metaCols||{}).POUCHES ?? 106, POUCHW: (state.metaCols||{}).POUCHW ?? 107, STRENGTH: (state.metaCols||{}).STRENGTH ?? 108, TASTE: (state.metaCols||{}).TASTE ?? 109,
+    MANUFACTURER: (state.metaCols||{}).MANUFACTURER ?? 110, INGREDIENTS: (state.metaCols||{}).INGREDIENTS ?? 111, UFI: (state.metaCols||{}).UFI ?? 112
   };
 
   const outputRows = [ZEUS_HEADERS];
@@ -2695,7 +2700,7 @@ async function odFetchAll() {
     const ws = wb.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
     state.metaHeaders = rows[0];
-    state.metaData = rows.slice(1).filter(r => r.some(v => v !== null));
+    state.metaData = rows.slice(1).filter(r => r.some(v => v !== null) && r[0] === true);
     document.getElementById('meta-name').textContent = OD_CONFIG.files.meta.label + ` · ark: "${sheetName}" (${state.metaData.length} rækker)`;
     document.getElementById('zone-meta').classList.add('has-file');
     document.getElementById('meta-badge').className = 'upload-badge';
