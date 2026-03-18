@@ -2841,28 +2841,21 @@ async function shopifyAPI(method, path, body) {
 }
 
 function htmlToRichText(html) {
-  // Convert simple HTML to Shopify rich_text_field JSON format
+  // Convert HTML to Shopify rich_text_field JSON format
   const children = [];
-  // Split on block-level tags
-  const blockRe = /<(h[1-6]|p|br)[^>]*>(.*?)<\/>|<br\s*\/?>/gi;
-  let lastIndex = 0;
+  const blockRe = /<(h[1-6]|p)[^>]*>([\s\S]*?)<\/\1>/gi;
   let match;
-  const str = html.replace(/<br\s*\/?>/gi, '');
-  const blocks = str.match(/<(h[1-6]|p)[^>]*>[\s\S]*?<\/>/gi) || [];
-  for (const block of blocks) {
-    const headingMatch = block.match(/^<h([1-6])[^>]*>([\s\S]*?)<\/h[1-6]>/i);
-    const paraMatch = block.match(/^<p[^>]*>([\s\S]*?)<\/p>/i);
-    if (headingMatch) {
-      const level = parseInt(headingMatch[1]);
-      const text = headingMatch[2].replace(/<[^>]+>/g, '').trim();
-      if (text) children.push({ type: 'heading', level, children: [{ type: 'text', value: text }] });
-    } else if (paraMatch) {
-      const text = paraMatch[1].replace(/<[^>]+>/g, '').trim();
-      if (text) children.push({ type: 'paragraph', children: [{ type: 'text', value: text }] });
+  while ((match = blockRe.exec(html)) !== null) {
+    const tag = match[1].toLowerCase();
+    const inner = match[2].replace(/<[^>]+>/g, '').trim();
+    if (!inner) continue;
+    if (tag.startsWith('h')) {
+      children.push({ type: 'heading', level: parseInt(tag[1]), children: [{ type: 'text', value: inner }] });
+    } else {
+      children.push({ type: 'paragraph', children: [{ type: 'text', value: inner }] });
     }
   }
   if (children.length === 0) {
-    // Fallback: plain text as paragraph
     const text = html.replace(/<[^>]+>/g, '').trim();
     if (text) children.push({ type: 'paragraph', children: [{ type: 'text', value: text }] });
   }
