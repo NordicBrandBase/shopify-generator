@@ -2920,13 +2920,15 @@ async function finalizeProducts() {
         addLog('info', 'SHOPIFY', `${product.handle}: ingen CDN-fil fundet — variant image sprunget over`);
       }
 
-      // Write Product Info metafield
+      // Write Product Info metafield — find existing id and PUT
       if (product.productInfo) {
-        const mfResult = await shopifyAPI('POST', `/admin/api/2026-01/products/${productId}/metafields.json`, {
-          metafield: { namespace: 'custom', key: 'product_info', value: product.productInfo, type: 'multi_line_text_field' }
-        });
-        if (mfResult.errors) addLog('warn', 'SHOPIFY', `${product.handle} metafelt: ${JSON.stringify(mfResult.errors)}`);
-        else addLog('ok', 'SHOPIFY', `${product.handle}: product_info metafelt skrevet ✓`);
+        const existingMf = await shopifyAPI('GET', `/admin/api/2026-01/products/${productId}/metafields.json?namespace=custom&key=product_info`);
+        const existing = (existingMf.metafields || [])[0];
+        if (existing) {
+          await shopifyAPI('PUT', `/admin/api/2026-01/metafields/${existing.id}.json`, {
+            metafield: { id: existing.id, value: product.productInfo, type: 'multi_line_text_field' }
+          });
+        }
       }
 
       ok++;
